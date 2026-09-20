@@ -7,6 +7,8 @@ const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const Admin: React.FC = () => {
   const [adminLayers, setAdminLayers] = useState<AdminLayerNode[]>([]);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('admin_auth') === 'true');
+  const [password, setPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'layers' | 'add' | 'basemap' | 'settings'>('layers');
   
   const [addMode, setAddMode] = useState<'url' | 'file'>('url');
@@ -286,6 +288,36 @@ const Admin: React.FC = () => {
       );
     });
   };
+
+  
+  if (!isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center w-full h-screen bg-gray-100">
+        <div className="bg-white p-8 rounded-lg shadow-xl w-96 flex flex-col items-center">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="font-bold text-2xl tracking-wider text-[#4ADE80]">Y</span>
+            <span className="font-semibold text-xl tracking-widest text-gray-800">UMESOKA</span>
+          </div>
+          <h1 className="text-xl font-bold text-[#0A2A1A] mb-2 text-center">Acceso Administrativo</h1>
+          <p className="text-sm text-gray-500 mb-6 text-center">Por favor ingresa la contraseña para acceder a las herramientas de configuración.</p>
+          <input 
+            type="password" 
+            value={password} 
+            onChange={e => setPassword(e.target.value)} 
+            onKeyDown={e => { if (e.key === 'Enter' && password === 'admin123') { localStorage.setItem('admin_auth', 'true'); setIsAuthenticated(true); } else if (e.key === 'Enter') { alert('Contraseña incorrecta'); } }}
+            className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4ADE80] mb-4"
+            placeholder="Contraseña"
+          />
+          <button 
+            onClick={() => { if (password === 'admin123') { localStorage.setItem('admin_auth', 'true'); setIsAuthenticated(true); } else { alert('Contraseña incorrecta'); } }}
+            className="w-full bg-[#0A2A1A] text-white font-bold py-2 rounded hover:bg-[#124b2f] transition-colors"
+          >
+            Ingresar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex w-full h-screen bg-gray-50 overflow-hidden">
