@@ -7,7 +7,6 @@ import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import WebGLTileLayer from 'ol/layer/WebGLTile';
 import GeoTIFF from 'ol/source/GeoTIFF';
-import Map from 'ol/Map';
 import { Fill, Stroke, Style, Circle as CircleStyle } from 'ol/style';
 import ImageLayer from 'ol/layer/Image';
 import ImageStatic from 'ol/source/ImageStatic';
@@ -206,7 +205,9 @@ export const parseFileToLayer = async (file: File | Blob, fileName: string): Pro
          // Fallback a WebGLTileLayer para imágenes gigantes
          console.warn('TIFF muy grande, usando WebGLTileLayer. Puede no mostrar colores indexados.');
          const source = new GeoTIFF({ sources: [{ blob: file as File }] });
-         return new WebGLTileLayer({ source: source });
+         const layer = new WebGLTileLayer({ source: source });
+         layer.set('isGeoTIFF', true);
+         return layer;
       }
 
       const rgb = await image.readRGB() as any;
@@ -271,7 +272,9 @@ export const parseFileToLayer = async (file: File | Blob, fileName: string): Pro
       const source = new GeoTIFF({
         sources: [{ blob: file as File }]
       });
-      return new WebGLTileLayer({ source: source });
+      const layer = new WebGLTileLayer({ source: source });
+      layer.set('isGeoTIFF', true);
+      return layer;
     }
   }
 

@@ -324,7 +324,7 @@ const Admin: React.FC = () => {
                   setDropPosition('bottom');
                 }
               }}
-              onDrop={(e) => {
+              onDrop={() => {
                 if (dragOverId === 'root' && draggedId) {
                   const newLayers = [...adminLayers];
                   const draggedIndex = newLayers.findIndex(l => l.id === draggedId);
@@ -393,7 +393,7 @@ const Admin: React.FC = () => {
         <div className="absolute top-4 right-4 z-20 bg-yellow-400 text-yellow-900 px-4 py-2 rounded-full font-bold shadow text-sm">
           MODO VISTA PREVIA (ADMIN)
         </div>
-        <MapComponent />
+        <MapComponent mode="admin" />
       </div>
     </div>
   );
