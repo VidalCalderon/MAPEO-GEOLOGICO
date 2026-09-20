@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-// import * as ol from 'ol';
 import Feature from 'ol/Feature';
+import { POLYGON_RULES } from '../utils/formRules';
 
 interface FeatureFormModalProps {
   feature: Feature | null;
@@ -9,6 +9,14 @@ interface FeatureFormModalProps {
   onSave: (properties: any) => void;
   onCancel: () => void;
 }
+
+// Dominios fijos para Puntos y Líneas
+const STATIC_DOMAINS = {
+  Puntos_TIPO: ['Falla', 'Venillas', 'Veta (>10cm)', 'Ledge', 'Estrato', 'Fractura', 'Foliación', 'Flow Banding', 'Dique', 'Dextral', 'Sinestral', 'Anticlinal', 'Sinclinal', 'Anticlinal Tumbado', 'Sinclinal Tumbado', 'Buzamiento Invertido', 'Brecha'],
+  Lineas_TIPO: ['Falla', 'Venillas', 'Veta (>10cm)', 'Ledge', 'Sobreescurrimiento', 'Zona de Falla', 'Zona de Fracturamiento', 'Anticlinal', 'Sinclinal', 'Discordancia', 'Esquistosidad', 'Laminación', 'Escape de Fluidos'],
+  Lineas_SUBTIPO: ['Venillas (<10cm)', 'Venilla A', 'Venilla B', 'Venilla C', 'Venilla D', 'Venilla EB', 'Venilla EDM', 'Venilla M', 'Stockwork', 'Craquelamiento', 'Diaclasas', 'Fracturas', 'Zona de Cizalla'],
+  Lineas_TEXTURA: ['Brechada', 'Shear Zone', 'Masiva', 'Bitumen', 'Bandeada', 'Crustiforme', 'Ebullición', 'Coloforme', 'Indiferenciado', 'Stockwork', 'Foliada', 'Planar', 'Cruzada']
+};
 
 const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryType, onSave, onCancel }) => {
   const [formData, setFormData] = useState<any>({});
@@ -21,7 +29,13 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    
+    // Si cambia el TIPO principal en un polígono, limpiamos los sub-campos
+    if (name === 'TIPO' && geometryType === 'Polygon') {
+      setFormData({ TIPO: value }); // Resetear el resto
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
     
     // Validadores en vivo
     const newErrors = { ...errors };
@@ -48,6 +62,11 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
     onSave(finalData);
   };
 
+  // Obtener las reglas dinámicas para el polígono seleccionado
+  const dynamicRules = geometryType === 'Polygon' && formData.TIPO && POLYGON_RULES[polygonCategory]
+    ? POLYGON_RULES[polygonCategory][formData.TIPO] 
+    : {};
+
   return (
     <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
@@ -72,7 +91,10 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
               <label className="block text-sm font-semibold text-gray-700 mb-1">Tipo de Capa</label>
               <select 
                 value={polygonCategory} 
-                onChange={(e: any) => setPolygonCategory(e.target.value)}
+                onChange={(e: any) => {
+                  setPolygonCategory(e.target.value);
+                  setFormData({}); // Limpiar datos al cambiar de categoría
+                }}
                 className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="Litologia">Litología</option>
@@ -89,13 +111,7 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
                 <label className="block text-sm font-semibold text-gray-700 mb-1">TIPO *</label>
                 <select name="TIPO" onChange={handleChange} className="w-full border border-gray-300 rounded p-2">
                   <option value="">Seleccione...</option>
-                  <option value="Falla">Falla</option>
-                  <option value="Venillas">Venillas</option>
-                  <option value="Veta (>10cm)">Veta (&gt;10cm)</option>
-                  <option value="Estrato">Estrato</option>
-                  <option value="Fractura">Fractura</option>
-                  <option value="Foliacion">Foliación</option>
-                  <option value="Dique">Dique</option>
+                  {STATIC_DOMAINS.Puntos_TIPO.map(x => <option key={x} value={x}>{x}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -125,18 +141,14 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
                   <label className="block text-sm font-semibold text-gray-700 mb-1">TIPO *</label>
                   <select name="TIPO" onChange={handleChange} className="w-full border border-gray-300 rounded p-2">
                     <option value="">Seleccione...</option>
-                    <option value="Falla">Falla</option>
-                    <option value="Venillas">Venillas</option>
-                    <option value="Veta (>10cm)">Veta (&gt;10cm)</option>
+                    {STATIC_DOMAINS.Lineas_TIPO.map(x => <option key={x} value={x}>{x}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">SUBTIPO</label>
                   <select name="SUBTIPO" onChange={handleChange} className="w-full border border-gray-300 rounded p-2">
                     <option value="">Seleccione...</option>
-                    <option value="Normal">Normal</option>
-                    <option value="Inversa">Inversa</option>
-                    <option value="Transcurrente">Transcurrente</option>
+                    {STATIC_DOMAINS.Lineas_SUBTIPO.map(x => <option key={x} value={x}>{x}</option>)}
                   </select>
                 </div>
               </div>
@@ -144,46 +156,46 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
                 <label className="block text-sm font-semibold text-gray-700 mb-1">TEXTURA</label>
                 <select name="TEXTURA" onChange={handleChange} className="w-full border border-gray-300 rounded p-2">
                   <option value="">Seleccione...</option>
-                  <option value="Masiva">Masiva</option>
-                  <option value="Bandeada">Bandeada</option>
-                  <option value="Brechada">Brechada</option>
+                  {STATIC_DOMAINS.Lineas_TEXTURA.map(x => <option key={x} value={x}>{x}</option>)}
                 </select>
               </div>
             </>
           )}
 
-          {/* CAMPOS PARA POLÍGONOS (LITOLOGÍA EJEMPLO) */}
-          {geometryType === 'Polygon' && polygonCategory === 'Litologia' && (
+          {/* CAMPOS PARA POLÍGONOS DINÁMICOS */}
+          {geometryType === 'Polygon' && (
             <>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">TIPO DE ROCA</label>
-                  <select name="TIPO" onChange={handleChange} className="w-full border border-gray-300 rounded p-2">
-                    <option value="">Seleccione...</option>
-                    <option value="Volcanico">Volcánico</option>
-                    <option value="Intrusivo">Intrusivo</option>
-                    <option value="Sedimentario">Sedimentario</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">TEXTURA</label>
-                  <select name="TEXTURA" onChange={handleChange} className="w-full border border-gray-300 rounded p-2">
-                    <option value="">Seleccione...</option>
-                    <option value="Porfirica">Porfírica</option>
-                    <option value="Afanitica">Afanítica</option>
-                    <option value="Granular">Granular</option>
-                  </select>
-                </div>
-              </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">FORMACIÓN</label>
-                <input type="text" name="FORMACION" onChange={handleChange} className="w-full border border-gray-300 rounded p-2" />
+                <label className="block text-sm font-semibold text-gray-700 mb-1">TIPO DE ROCA / ALTERACIÓN</label>
+                <select name="TIPO" value={formData.TIPO || ''} onChange={handleChange} className="w-full border border-gray-300 rounded p-2">
+                  <option value="">Seleccione...</option>
+                  {Object.keys(POLYGON_RULES[polygonCategory] || {}).map(tipo => (
+                    <option key={tipo} value={tipo}>{tipo}</option>
+                  ))}
+                </select>
               </div>
+
+              {/* RENDERIZADO DINÁMICO DE SUB-CAMPOS */}
+              {dynamicRules && Object.keys(dynamicRules).length > 0 && (
+                <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-4 mt-2">
+                  {Object.entries(dynamicRules).map(([field, options]) => (
+                    <div key={field}>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">{field}</label>
+                      <select name={field} onChange={handleChange} className="w-full border border-gray-300 rounded p-2">
+                        <option value="">Seleccione...</option>
+                        {(options as string[]).map(opt => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
 
-          {/* CAMPOS COMUNES */}
-          <div>
+          {/* CAMPOS COMUNES (SIEMPRE VISIBLES) */}
+          <div className="border-t border-gray-200 pt-4 mt-4">
             <label className="block text-sm font-semibold text-gray-700 mb-1">DESCRIPCIÓN</label>
             <textarea name="DESCRIPCION" rows={3} onChange={handleChange} className="w-full border border-gray-300 rounded p-2" placeholder="Notas de campo..."></textarea>
           </div>

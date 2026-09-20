@@ -405,6 +405,14 @@ const MapComponent: React.FC<MapComponentProps> = ({ mode = 'client' }) => {
         source: source,
         type: activeTool,
       });
+
+      drawRef.current.on('drawend', (e) => {
+        const feature = e.feature;
+        setTimeout(() => {
+           source.removeFeature(feature);
+           setPendingFeature({ feature, type: activeTool });
+        }, 10);
+      });
       map.addInteraction(drawRef.current);
     }
 
