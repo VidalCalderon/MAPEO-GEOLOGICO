@@ -238,28 +238,40 @@ export const CustomLayerList = (props: LayerListProps) => {
   };
 
   const zoomToLayer = async (layer: any) => {
+    if (!activeView) {
+      console.warn("No hay vista activa para hacer zoom.");
+      return;
+    }
+    
     let extentToZoom = layer.fullExtent;
     
+    // Si es un Sublayer y no tiene fullExtent, intentar obtenerlo de la capa padre
+    if (!extentToZoom && layer.layer && layer.layer.fullExtent) {
+      extentToZoom = layer.layer.fullExtent;
+    }
+
     // Si la capa permite consultar su extensión real (útil si hay filtros)
-    if (layer.queryExtent) {
+    if (typeof layer.queryExtent === 'function') {
       try {
         const result = await layer.queryExtent();
         if (result && result.extent) {
           extentToZoom = result.extent;
         }
       } catch (e) {
-        console.warn("No se pudo hacer queryExtent", e);
+        console.warn("No se pudo hacer queryExtent, se usará fullExtent si está disponible", e);
       }
     }
 
     if (extentToZoom) {
-      // expand(1.2) da un margen del 20% para que no quede pegado a los bordes
-      let expandedExtent = extentToZoom;
-      if (extentToZoom.expand) {
-         expandedExtent = extentToZoom.clone().expand(1.2);
-      }
-      
-      activeView.goTo(expandedExtent).then(() => {
+      try {
+        // expand(1.2) da un margen del 20% para que no quede pegado a los bordes
+        let expandedExtent = extentToZoom;
+        if (typeof extentToZoom.clone === 'function' && typeof extentToZoom.expand === 'function') {
+           expandedExtent = extentToZoom.clone().expand(1.2);
+        }
+        
+        await activeView.goTo(expandedExtent);
+        
         // Corrección de escala: Si la capa tiene rangos de visibilidad y nos pasamos, corregimos la escala
         const currentScale = activeView.scale;
         let newScale = currentScale;
@@ -275,10 +287,13 @@ export const CustomLayerList = (props: LayerListProps) => {
         }
 
         if (newScale !== currentScale) {
-          activeView.goTo({ scale: newScale });
+          await activeView.goTo({ scale: newScale });
         }
-      });
+      } catch (error) {
+        console.error("Error al hacer zoom a la capa:", error);
+      }
     } else {
+      console.warn("La capa no tiene extensión definida:", layer);
       alert("Esta capa no tiene una extensión definida.");
     }
   };

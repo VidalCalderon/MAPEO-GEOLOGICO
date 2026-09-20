@@ -1,0 +1,22 @@
+{
+  "name": "vista-2d3d",
+  "label": "Vista 2D/3D",
+  "type": "widget",
+  "version": "1.20.0",
+  "exbVersion": "1.20.0",
+  "author": "Antigravity",
+  "description": "Widget para alternar entre vista 2D y 3D, e iniciar visualización en relieve 3D dinámica.",
+  "copyright": "",
+  "license": "http://www.apache.org/licenses/LICENSE-2.0",
+  "dependency": "jimu-arcgis",
+  "properties": {
+    "hasSettingPage": true
+  },
+  "translatedLocales": [
+    "en"
+  ],
+  "defaultSize": {
+    "width": 300,
+    "height": 200
+  }
+}

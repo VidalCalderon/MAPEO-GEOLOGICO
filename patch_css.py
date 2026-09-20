@@ -1,12 +1,8 @@
-@import "tailwindcss";
+import sys
 
-html, body, #root {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%;
-}
-
+file_path = 'd:/MAPEO-GEOLOGICO/frontend/src/index.css'
+with open(file_path, 'a', encoding='utf-8') as f:
+    f.write('''
 
 /* Custom Scrollbar for Widgets */
 .custom-scrollbar::-webkit-scrollbar {
@@ -27,3 +23,5 @@ html, body, #root {
   scrollbar-width: thin;
   scrollbar-color: #c1c1c1 transparent;
 }
+''')
+print("Added scrollbar CSS")
