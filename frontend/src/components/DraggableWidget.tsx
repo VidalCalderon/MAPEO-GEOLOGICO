@@ -76,15 +76,16 @@ const DraggableWidget: React.FC<DraggableWidgetProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div 
+      <div 
       ref={widgetRef}
-      className="fixed bg-white shadow-2xl z-40 flex flex-col border border-gray-300 font-sans"
+      className={`fixed bg-white shadow-2xl z-40 flex flex-col border border-gray-300 font-sans ${isMinimized ? '!h-auto' : ''}`}
       style={{ 
         left: `${pos.x}px`, 
         top: `${pos.y}px`, 
         maxHeight: isMinimized ? 'auto' : '90vh',
-        minWidth: '250px',
+        minWidth: isMinimized ? 'auto' : '250px',
         minHeight: isMinimized ? 'auto' : '150px',
+        height: isMinimized ? 'auto' : undefined,
         resize: isMinimized ? 'none' : 'both',
         overflow: 'hidden'
       }}

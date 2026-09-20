@@ -52,6 +52,22 @@ const BASEMAPS = [
     }) 
   },
   { id: 'topo', name: 'Topográfico (Esri)', getSource: () => new XYZ({ 
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+      maxZoom: 23
+    }) 
+  },
+];
+
+interface MapComponentProps {
+  mode?: 'client' | 'admin';
+}
+
+const MapComponent: React.FC<MapComponentProps> = ({ mode = 'client' }) => {
+  const mapElement = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<Map | null>(null);
+  const sourceRef = useRef<VectorSource | null>(null);
+  const baseLayerRef = useRef<TileLayer<OSM | XYZ | TileArcGISRest> | null>(null);
+  const drawRef = useRef<Draw | null>(null);
   const modifyRef = useRef<Modify | null>(null);
   const snapRef = useRef<Snap | null>(null);
   const ol3dRef = useRef<any>(null); // Referencia a la instancia de OLCesium
@@ -65,7 +81,6 @@ const BASEMAPS = [
   const [layerSearchQuery, setLayerSearchQuery] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-
   const [tableData, setTableData] = useState<{title: string, headers: string[], rows: any[]} | null>(null);
   const [isLoadingTable, setIsLoadingTable] = useState(false);
 
@@ -408,6 +423,16 @@ const BASEMAPS = [
         else if (typeof source.getUrl === 'function' && source.getUrl()) arcgisUrl = source.getUrl();
     }
 
+    
+    // 0. Vector
+    if (source && typeof source.getExtent === 'function') {
+        const extent = source.getExtent();
+        if (extent && extent[0] !== Infinity && extent[0] !== -Infinity) {
+            mapRef.current!.getView().fit(extent, { duration: 1000, padding: [50, 50, 50, 50] });
+            return;
+        }
+    }
+
     // 1. TIFF
     if (source && typeof source.getView === 'function') {
         const viewPromise = source.getView();
@@ -629,6 +654,7 @@ const BASEMAPS = [
   };
 
   
+  
   const handleAddToTable = (item: LayerItem) => {
     if (!item.layer) return;
     setIsLoadingTable(true);
@@ -636,14 +662,13 @@ const BASEMAPS = [
 
     const layerTitle = item.title;
     let arcgisUrl = item.layer.get('originalUrl') || item.layer.get('url') || '';
-    const source = typeof item.layer.getSource === 'function' ? item.layer.getSource() : null;
+    const source = typeof (item.layer as any).getSource === 'function' ? (item.layer as any).getSource() : null;
 
     if (!arcgisUrl && source) {
         if (typeof (source as any).getUrls === 'function' && (source as any).getUrls()?.length > 0) arcgisUrl = (source as any).getUrls()[0];
         else if (typeof (source as any).getUrl === 'function' && (source as any).getUrl()) arcgisUrl = (source as any).getUrl();
     }
 
-    // 1. Vector Layers (GeoJSON, SHP)
     if (source && typeof (source as any).getFeatures === 'function') {
       const features = (source as any).getFeatures();
       if (features.length > 0) {
@@ -661,7 +686,6 @@ const BASEMAPS = [
       }
     }
 
-    // 2. ArcGIS REST Layers
     if (arcgisUrl && typeof arcgisUrl === 'string' && arcgisUrl.toLowerCase().includes('mapserver')) {
       let url = arcgisUrl;
       const params = source && typeof (source as any).getParams === 'function' ? (source as any).getParams() : {};
@@ -681,13 +705,12 @@ const BASEMAPS = [
 
       const queryUrl = url + '/query?where=1=1&outFields=*&returnGeometry=false&f=pjson';
 
-      // Use JSONP to bypass CORS
       const callbackName = 'jsonp_table_' + Math.round(1000000 * Math.random());
       const script = document.createElement('script');
       script.src = queryUrl + '&callback=' + callbackName;
 
       let jsonpTimeout = setTimeout(() => {
-          document.body.removeChild(script);
+          if (document.body.contains(script)) document.body.removeChild(script);
           delete (window as any)[callbackName];
           setIsLoadingTable(false);
           alert('Tiempo de espera agotado al obtener datos de la tabla.');
@@ -695,7 +718,7 @@ const BASEMAPS = [
 
       (window as any)[callbackName] = (data: any) => {
           clearTimeout(jsonpTimeout);
-          document.body.removeChild(script);
+          if (document.body.contains(script)) document.body.removeChild(script);
           delete (window as any)[callbackName];
           setIsLoadingTable(false);
           
@@ -710,7 +733,7 @@ const BASEMAPS = [
       
       script.onerror = () => {
           clearTimeout(jsonpTimeout);
-          document.body.removeChild(script);
+          if (document.body.contains(script)) document.body.removeChild(script);
           delete (window as any)[callbackName];
           setIsLoadingTable(false);
           alert('Error de red al intentar obtener los atributos.');
@@ -723,7 +746,6 @@ const BASEMAPS = [
     setIsLoadingTable(false);
     alert('No se pueden extraer atributos de este tipo de capa o la capa está vacía.');
   };
-
 
   const handleOpacityChange = (id: string, opacity: number) => {
     if (!mapRef.current) return;
@@ -747,18 +769,133 @@ const BASEMAPS = [
 
   const renderUserLayerTree = (nodes: LayerItem[], depth: number = 0) => {
     let displayNodes = nodes;
+    if (depth === 0 && layerSearchQuery) {
+      const query = layerSearchQuery.toLowerCase();
+      const filterRecursive = (items: LayerItem[]): LayerItem[] => {
+        const result: LayerItem[] = [];
+        items.forEach(item => {
+          if (item.title.toLowerCase().includes(query)) {
+            result.push(item);
+          } else if (item.children) {
+            const childMatches = filterRecursive(item.children);
+            if (childMatches.length > 0) result.push({ ...item, children: childMatches });
+          }
+        });
+        return result;
+      };
+      displayNodes = filterRecursive(nodes);
+    }
+
+    return displayNodes.map(item => {
+      const isExpanded = !!expandedGroups[item.id];
+      const hasMenuOpen = activeMenuId === item.id;
+      return (
+        <div key={item.id} className="text-[11px] select-none">
+          <div onDoubleClick={() => zoomToLayer(item.id)} className="flex items-center justify-between p-1.5 border-b border-gray-200 bg-white hover:bg-gray-100 transition-colors relative cursor-pointer"
+            style={{ paddingLeft: `${depth * 16 + 8}px` }}
+          >
+            <div className="flex items-center gap-1.5 overflow-hidden flex-1">
+              <div className="cursor-grab text-gray-400 hover:text-gray-600">
+                <GripVertical size={14} />
+              </div>
+
+              {item.isGroup ? (
+                <button onClick={(e) => { e.stopPropagation(); toggleGroupExpanded(item.id); }} className="text-gray-600 hover:text-gray-900 focus:outline-none">
+                  {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </button>
+              ) : (
+                <div className="w-3.5" />
+              )}
+              
+              <button onClick={() => toggleLayerVisibility(item.id)} className="text-gray-700 hover:text-black focus:outline-none ml-1">
+                {item.visible ? <CheckSquare size={14} className="text-blue-600 bg-white rounded-sm" /> : <Square size={14} className="text-gray-400" />}
+              </button>
+              
+              <span className={`truncate flex-1 text-gray-800 tracking-wide ml-1 ${item.isGroup ? 'font-medium' : ''}`} title={item.title}>{item.title.toUpperCase()}</span>
+            </div>
+            
+            <div className="flex items-center gap-0.5 pr-1">
+              {!item.isGroup && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); zoomToLayer(item.id); }} 
+                  className="p-1 rounded text-gray-400 hover:bg-gray-200 hover:text-blue-600 transition-colors"
+                  title="Acercar a esta capa"
+                >
+                  <Search size={14}/>
+                </button>
+              )}
+              <button 
+                onClick={(e) => { e.stopPropagation(); setActiveMenuId(hasMenuOpen ? null : item.id); }} 
+                className={`p-1 rounded transition-colors ${hasMenuOpen ? 'bg-gray-200 text-black' : 'text-gray-400 hover:bg-gray-200 hover:text-gray-800'}`}
+              >
+                <MoreHorizontal size={14}/>
+              </button>
+            </div>
+
+            {hasMenuOpen && (
+              <div className="absolute right-0 top-8 w-64 bg-white border border-gray-200 shadow-xl rounded-sm z-50 flex flex-col py-1 text-xs text-gray-700" onClick={(e) => e.stopPropagation()}>
+                {item.isCustom && (
+                  <button onClick={() => { removeCustomLayer(item.id, item.layer); setActiveMenuId(null); }} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 text-left w-full text-red-600 font-medium">
+                    <Trash2 size={14} /> Eliminar Capa
+                  </button>
+                )}
+                <button className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 text-left w-full">
+                  <EyeOff size={14} /> Deshabilitar elemento emergente
+                </button>
+                <button className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 text-left w-full">
+                  <Sliders size={14} /> Rango de visibilidad
+                </button>
+                <button className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 text-left w-full">
+                  <Info size={14} /> Detalles
+                </button>
+                <button className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 text-left w-full">
+                  <Search size={14} /> Definir filtro
+                </button>
+                <button className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 text-left w-full">
+                  <Square size={14} /> Calcular estadísticas
+                </button>
+                <button 
+                  className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 text-left w-full font-medium text-blue-700 bg-blue-50/50"
+                  onClick={() => { handleAddToTable(item); setActiveMenuId(null); }}
+                >
+                  <TableProperties size={14} /> Agregar a tabla
+                </button>
+                <button className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 text-left w-full justify-between">
+                  <div className="flex items-center gap-2"><MapIcon size={14} /> Exportar</div>
+                  <ChevronRight size={14} />
+                </button>
+                <div className="h-px bg-gray-200 my-1 mx-2"></div>
+                <div className="px-3 py-2 flex flex-col gap-1">
+                  <span className="flex items-center gap-2 font-medium text-gray-600"><Sliders size={12} /> Transparencia: {100 - item.opacity}%</span>
+                  <input 
+                    type="range" min="0" max="100" value={item.opacity} 
+                    onChange={(e) => handleOpacityChange(item.id, parseInt(e.target.value))}
+                    className="w-full h-1 bg-gray-200 rounded appearance-none cursor-pointer accent-gray-700 mt-1"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {item.isGroup && isExpanded && item.children && (
+            <div>
+              {renderUserLayerTree(item.children, depth + 1)}
+            </div>
+          )}
+        </div>
+      );
+    });
+  };
+
   return (
     <div className="w-full h-full flex flex-col overflow-hidden bg-gray-50">
-      {mode === 'client' && (
-        <>
-          {/* Main Header */}
-          <div className="h-14 bg-[#0A2A1A] flex items-center justify-between px-6 text-white z-40 shrink-0 shadow-md">
+      <div className="h-14 bg-[#0A2A1A] flex items-center justify-between px-6 text-white z-40 shrink-0 shadow-md">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-2xl tracking-wider text-[#4ADE80]">B</span>
-              <span className="font-semibold text-xl tracking-widest text-gray-100">UENAVENTURA</span>
+              <span className="font-bold text-2xl tracking-wider text-[#4ADE80]">Y</span>
+              <span className="font-semibold text-xl tracking-widest text-gray-100">UMESOKA</span>
             </div>
             <div className="font-bold text-[#e1c142] text-xl tracking-wide">
-              Geology integration system
+              SISTEMA DE INTEGRACION GEOLÓGICA
             </div>
             <div>
               <button className="bg-[#e1c142] text-[#0A2A1A] px-6 py-1.5 rounded font-bold text-sm hover:bg-[#f2d253] transition-colors shadow-sm">
@@ -767,7 +904,6 @@ const BASEMAPS = [
             </div>
           </div>
           
-          {/* Secondary Ribbon / Toolbar */}
           <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-end px-4 gap-3 z-30 shrink-0 shadow-sm text-sm">
             <div className="flex items-center gap-1 bg-gray-50 rounded px-3 py-1.5 cursor-pointer hover:bg-gray-100 border border-gray-300 text-gray-700 font-medium transition-colors">
               <span>Analysis Tools</span>
@@ -802,75 +938,47 @@ const BASEMAPS = [
               <Search className="absolute left-2.5 top-2 text-gray-400" size={14} />
             </div>
           </div>
-        </>
-      )}
 
-      {/* Main Content Area */}
       <div className="flex-1 w-full relative flex overflow-hidden">
         
-        {/* BARRA LATERAL IZQUIERDA (Only Admin) */}
-        {mode === 'admin' && (
-          <div className="w-16 bg-[#2b2b2b] text-white flex flex-col items-center py-4 gap-4 z-20 shadow-2xl border-r border-gray-700 relative shrink-0">
-            <button onClick={() => setActiveTool(null)} className={`p-3 rounded-lg hover:bg-gray-700 transition ${activeTool === null && !is3DMode ? 'bg-blue-600 shadow-inner' : ''}`} title="Navegar">
-              <MousePointer2 size={24} />
-            </button>
-            <button onClick={() => setActiveTool('Polygon')} className={`p-3 rounded-lg hover:bg-gray-700 transition ${activeTool === 'Polygon' ? 'bg-blue-600 shadow-inner' : ''}`} title="Dibujar Polígono">
-              <Hexagon size={24} />
-            </button>
-            <button onClick={() => setActiveTool('LineString')} className={`p-3 rounded-lg hover:bg-gray-700 transition ${activeTool === 'LineString' ? 'bg-blue-600 shadow-inner' : ''}`} title="Dibujar Línea">
-              <Minus size={24} />
-            </button>
-            <button onClick={() => setActiveTool('Point')} className={`p-3 rounded-lg hover:bg-gray-700 transition ${activeTool === 'Point' ? 'bg-blue-600 shadow-inner' : ''}`} title="Añadir Punto">
-              <MapPin size={24} />
-            </button>
-            
-            <div className="w-10 h-px bg-gray-600 my-1"></div>
-            
-            <button onClick={() => setActiveTool('Modify')} className={`p-3 rounded-lg hover:bg-gray-700 transition ${activeTool === 'Modify' ? 'bg-green-600 shadow-inner' : ''}`} title="Modificar vértices">
-              <PenTool size={24} />
-            </button>
+        
 
-            <div className="w-10 h-px bg-gray-600 my-1"></div>
-
-            <button onClick={() => setActiveTool(activeTool === 'AddLayer' ? null : 'AddLayer')} className={`p-3 rounded-lg hover:bg-gray-700 transition ${activeTool === 'AddLayer' ? 'bg-amber-600 shadow-inner' : ''}`} title="Añadir Datos / Catálogo">
-              <Database size={24} />
-            </button>
-
-            <button onClick={() => setActiveTool(activeTool === 'Basemap' ? null : 'Basemap')} className={`p-3 rounded-lg hover:bg-gray-700 transition ${activeTool === 'Basemap' ? 'bg-indigo-600 shadow-inner' : ''}`} title="Cambiar Mapa Base">
-              <Globe size={24} />
-            </button>
-
-            <button onClick={() => setIs3DMode(!is3DMode)} className={`p-3 rounded-lg hover:bg-gray-700 transition ${is3DMode ? 'bg-purple-600 shadow-inner' : 'text-gray-400'}`} title="Cambiar vista a 3D (Globo Terráqueo)">
-              <Box size={24} />
-            </button>
-          </div>
-        )}
-
-        {/* ÁREA DEL MAPA Y TABLA */}
         <div className="flex-1 relative bg-gray-100 flex flex-col overflow-hidden">
           
           <div className="flex-1 relative">
             <div ref={mapElement} className="absolute inset-0" />
             
-            {mode === 'admin' && (
-              <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-md px-6 py-4 rounded-xl shadow-lg z-10 border border-gray-200">
-                <h1 className="text-2xl font-black text-gray-800 tracking-tight">Web GIS</h1>
-                <p className="text-sm text-gray-500 font-medium">Mapeo Geológico</p>
-                {is3DMode && (
-                  <div className="mt-2 text-xs font-bold text-purple-600 bg-purple-100 px-2 py-1 rounded inline-block">
-                    MODO 3D ACTIVO
-                  </div>
-                )}
-              </div>
-            )}
+            
 
-            {mode === 'admin' && (
-              <button onClick={() => setIsLayerListOpen(!isLayerListOpen)} className="absolute top-4 right-4 bg-white p-3 rounded-lg shadow-lg z-10 hover:bg-gray-50 border border-gray-200 text-gray-700" title="Gestor de Capas">
-                <Layers size={24} />
+            <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
+              <button 
+                onClick={() => setIsLayerListOpen(!isLayerListOpen)} 
+                className="bg-white p-2 rounded shadow-md border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors"
+                title="Capas del mapa"
+              >
+                <Layers size={20} />
               </button>
-            )}
+              <button 
+                onClick={() => { mapRef.current?.getView().setZoom(5); mapRef.current?.getView().setCenter(fromLonLat([-75.0, -10.0])); }} 
+                className="bg-white p-2 rounded shadow-md border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors"
+                title="Vista inicial"
+              >
+                <Globe size={20} />
+              </button>
+              <button 
+                className="bg-white p-2 rounded shadow-md border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors"
+                title="Buscar ubicación"
+              >
+                <Search size={20} />
+              </button>
+              <button 
+                className="bg-white p-2 rounded shadow-md border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors"
+                title="Brújula / Navegación"
+              >
+                <Compass size={20} />
+              </button>
+            </div>
 
-            {/* Overlays (Add Layer, Basemap) */}
             {activeTool === 'AddLayer' && (
               <div className={`absolute ${mode === 'admin' ? 'left-4 top-1/4' : 'right-4 top-4'} bg-white rounded-xl shadow-2xl border border-gray-200 w-80 text-gray-800 flex flex-col overflow-hidden z-40`}>
                 <div className="bg-amber-50 p-4 border-b border-amber-100 flex items-center justify-between">
@@ -938,10 +1046,8 @@ const BASEMAPS = [
             )}
           </div>
           
-          {/* Bottom Attribute Table Panel (Only Client) */}
-          {mode === 'client' && (tableData || isLoadingTable) && (
+          {(tableData || isLoadingTable) && (
             <div className="h-64 bg-white border-t border-gray-300 flex flex-col z-10 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-              {/* Resizer handle */}
               <div className="h-1.5 w-full bg-gray-200 cursor-row-resize flex justify-center items-center hover:bg-gray-300">
                 <div className="w-8 h-0.5 bg-gray-400 rounded-full"></div>
               </div>
@@ -998,7 +1104,6 @@ const BASEMAPS = [
         </div>
       </div>
 
-      {/* PANEL DE GESTIÓN DE CAPAS (Flotante) */}
       <DraggableWidget 
         title="Capas del mapa" 
         isOpen={isLayerListOpen} 
@@ -1006,29 +1111,18 @@ const BASEMAPS = [
         defaultPosition={{ x: mode === 'client' ? 24 : (window.innerWidth > 400 ? window.innerWidth - 380 : 16), y: mode === 'client' ? 120 : 16 }}
       >
         <div className="flex flex-col h-full bg-white">
-          {mode === 'client' && (
-            <div className="px-3 py-2 bg-[#000000] text-white text-xs flex items-center gap-2">
-              <Layers size={14} /> Capas del mapa
-              <div className="ml-auto flex gap-2">
-                <button className="hover:text-gray-300"><ChevronUp size={14}/></button>
-                <button onClick={() => setIsLayerListOpen(false)} className="hover:text-gray-300"><X size={14}/></button>
-              </div>
+          <div className="p-2 border-b border-gray-200">
+            <div className="relative">
+              <input 
+                type="text" 
+                placeholder="Buscar capa..." 
+                className="w-full text-xs pl-8 pr-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:border-gray-500"
+                value={layerSearchQuery}
+                onChange={(e) => setLayerSearchQuery(e.target.value)}
+              />
+              <Search size={12} className="absolute left-2.5 top-2 text-gray-400" />
             </div>
-          )}
-          {mode === 'client' && (
-            <div className="p-2 border-b border-gray-200">
-              <div className="relative">
-                <input 
-                  type="text" 
-                  placeholder="Buscar capa..." 
-                  className="w-full text-xs pl-8 pr-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:border-gray-500"
-                  value={layerSearchQuery}
-                  onChange={(e) => setLayerSearchQuery(e.target.value)}
-                />
-                <Search size={12} className="absolute left-2.5 top-2 text-gray-400" />
-              </div>
-            </div>
-          )}
+          </div>
           <div className="flex-1 overflow-y-auto min-h-[100px] custom-scrollbar" onClick={() => setActiveMenuId(null)}>
             {renderUserLayerTree(layersList, 0)}
           </div>
