@@ -3,6 +3,7 @@ import 'ol/ol.css';
 import * as ol from 'ol';
 import Map from 'ol/Map';
 import View from 'ol/View';
+import GeoJSON from 'ol/format/GeoJSON';
 import TileLayer from 'ol/layer/Tile';
 import OSM from 'ol/source/OSM';
 import XYZ from 'ol/source/XYZ';
@@ -26,6 +27,8 @@ register(proj4);
 
 
 import DraggableWidget from './DraggableWidget';
+import FeatureFormModal from './FeatureFormModal';
+import Feature from 'ol/Feature';
 
 // Cesium debe estar en el objeto global para que ol-cesium funcione en Vite
 import * as Cesium from 'cesium';
@@ -91,9 +94,52 @@ const MapComponent: React.FC<MapComponentProps> = ({ mode = 'client' }) => {
   const [customLayerTitle, setCustomLayerTitle] = useState('');
   const [customLayerFile, setCustomLayerFile] = useState<File | null>(null);
   const [addMode, setAddMode] = useState<'url' | 'file'>('url');
+  const [pendingFeature, setPendingFeature] = useState<{feature: Feature, type: string} | null>(null);
+
+  
+  const loadServerDrawings = async () => {
+    try {
+      const res = await fetch('https://gimatc.pe/guardar_mapa.php');
+      if (res.ok) {
+        const geojson = await res.json();
+        if (geojson && geojson.features && geojson.features.length > 0) {
+          const format = new GeoJSON();
+          const features = format.readFeatures(geojson, { dataProjection: 'EPSG:4326', featureProjection: 'EPSG:3857' });
+          if (sourceRef.current) {
+             sourceRef.current.clear();
+             sourceRef.current.addFeatures(features);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error al cargar dibujos:", e);
+    }
+  };
+
+  const saveServerDrawings = async () => {
+    if (!sourceRef.current) return;
+    try {
+      const format = new GeoJSON();
+      const geojson = format.writeFeaturesObject(sourceRef.current.getFeatures(), { dataProjection: 'EPSG:4326', featureProjection: 'EPSG:3857' });
+      
+      const res = await fetch('https://gimatc.pe/guardar_mapa.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(geojson)
+      });
+      
+      if (res.ok) {
+        alert('Dibujos guardados en tu servidor cPanel exitosamente.');
+      } else {
+        alert('Error al guardar en el servidor.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error de conexión al servidor.');
+    }
+  };
 
   useEffect(() => {
-
     const source = new VectorSource();
     sourceRef.current = source;
 
@@ -151,6 +197,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ mode = 'client' }) => {
 
     // Restaurado: Esto es lo que faltaba llamar
     loadSavedLayers(map);
+    loadServerDrawings();
 
     // Actualizar lista inicial
     updateLayersList(map);
@@ -923,6 +970,15 @@ const MapComponent: React.FC<MapComponentProps> = ({ mode = 'client' }) => {
               </>
             )}
 
+            
+            <button 
+               onClick={saveServerDrawings}
+               className="flex items-center gap-2 bg-blue-600 text-white rounded px-3 py-1.5 cursor-pointer hover:bg-blue-700 font-medium transition-colors"
+               title="Guardar Dibujos en cPanel"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+              <span>Guardar Nube</span>
+            </button>
             <div className="h-6 w-px bg-gray-300 mx-1"></div>
             
             <div className="flex items-center gap-1">
@@ -1051,6 +1107,25 @@ const MapComponent: React.FC<MapComponentProps> = ({ mode = 'client' }) => {
             )}
           </div>
           
+
+          
+      {/* FORMULARIO AVANZADO MODAL */}
+      {pendingFeature && (
+        <FeatureFormModal 
+          feature={pendingFeature.feature}
+          geometryType={pendingFeature.type}
+          onSave={(properties) => {
+            pendingFeature.feature.setProperties(properties);
+            sourceRef.current?.addFeature(pendingFeature.feature);
+            setPendingFeature(null);
+            // Si quieres que guarde automáticamente en la nube tras llenar el form:
+            // setTimeout(() => saveServerDrawings(), 500);
+          }}
+          onCancel={() => {
+            setPendingFeature(null);
+          }}
+        />
+      )}
 
           {/* TABLA DE ATRIBUTOS (SIEMPRE RENDERIZADA) */}
           <div 
