@@ -13,7 +13,7 @@ import Draw from 'ol/interaction/Draw';
 import Modify from 'ol/interaction/Modify';
 import Snap from 'ol/interaction/Snap';
 import { fromLonLat, transformExtent } from 'ol/proj';
-import { RefreshCw, Filter, Columns, SlidersHorizontal, Ruler, Layers, Map as MapIcon, Compass, Globe, Navigation, MousePointer2, Settings, Crosshair, MapPin, ZoomIn, Info, Eye, EyeOff, Trash2, Box, Database, Search, Link as LinkIcon, Plus, Folder, FolderOpen, ChevronRight, ChevronDown, CheckSquare, Square, MoreVertical, MoreHorizontal, Hexagon, Minus, PenTool, GripVertical, X, ChevronUp, Sliders, TableProperties } from 'lucide-react';
+import { RefreshCw, Filter, Columns, SlidersHorizontal, Ruler, Layers, Map as MapIcon, Compass, Globe, MousePointer2, MapPin, Info, EyeOff, Trash2, Box, Database, Search, Link as LinkIcon, Plus, ChevronRight, ChevronDown, CheckSquare, Square, MoreHorizontal, Hexagon, Minus, PenTool, GripVertical, X, ChevronUp, Sliders, TableProperties } from 'lucide-react';
 import BaseLayer from 'ol/layer/Base';
 import proj4 from 'proj4';
 import { register } from 'ol/proj/proj4';
@@ -87,7 +87,6 @@ const MapComponent: React.FC<MapComponentProps> = ({ mode = 'client' }) => {
   const [tableHeight, setTableHeight] = useState(256);
 
   // Estados para la herramienta de Añadir Capas
-  const [addLayerTab, setAddLayerTab] = useState<'search' | 'url'>('url');
   const [customLayerUrl, setCustomLayerUrl] = useState('');
   const [customLayerTitle, setCustomLayerTitle] = useState('');
   const [customLayerFile, setCustomLayerFile] = useState<File | null>(null);
@@ -209,11 +208,6 @@ const MapComponent: React.FC<MapComponentProps> = ({ mode = 'client' }) => {
     const currentLayers = buildTree(map.getLayers());
     setLayersList(currentLayers.reverse());
   };
-
-  // NUEVO ESTADO PARA ERRORES GLOBALES
-  const [debugError, setDebugError] = useState<string>('Sin errores');
-  const [debugCounts, setDebugCounts] = useState<{user: number, admin: number}>({user: 0, admin: 0});
-  const [debugInner, setDebugInner] = useState<string>('Not run');
 
   const loadSavedLayers = async (map: Map) => {
     // 1. CARGAR CAPAS DE USUARIO (Plano)
@@ -372,11 +366,6 @@ const MapComponent: React.FC<MapComponentProps> = ({ mode = 'client' }) => {
       map.addInteraction(snapRef.current);
     }
   }, [activeTool]);
-
-  const [debugAdminLayers, setDebugAdminLayers] = useState('...');
-  useEffect(() => {
-    setDebugAdminLayers(localStorage.getItem('admin_layers') || 'VACIO');
-  }, []);
 
   const toggleLayerVisibility = (id: string) => {
     if (!mapRef.current) return;
@@ -544,7 +533,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ mode = 'client' }) => {
     }
 };
 
-  const removeCustomLayer = (id: string, layer: BaseLayer) => {
+  const removeCustomLayer = (_id: string, layer: BaseLayer) => {
     if (!mapRef.current) return;
     
     // Eliminar del mapa
