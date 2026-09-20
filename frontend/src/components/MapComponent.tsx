@@ -899,25 +899,29 @@ const MapComponent: React.FC<MapComponentProps> = ({ mode = 'client' }) => {
           </div>
           
           <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-end px-4 gap-3 z-30 shrink-0 shadow-sm text-sm">
-            <div className="flex items-center gap-1 bg-gray-50 rounded px-3 py-1.5 cursor-pointer hover:bg-gray-100 border border-gray-300 text-gray-700 font-medium transition-colors">
-              <span>Analysis Tools</span>
-              <ChevronDown size={16} />
-            </div>
-            
-            <div className="relative group">
-              <div className="flex items-center gap-1 bg-gray-50 rounded px-3 py-1.5 cursor-pointer hover:bg-gray-100 border border-gray-300 text-gray-700 font-medium transition-colors">
-                <span>Tools</span>
-                <ChevronDown size={16} />
-              </div>
-              <div className="absolute top-full right-0 mt-1 w-48 bg-white border border-gray-200 shadow-xl rounded-md hidden group-hover:flex flex-col py-1 z-50">
-                <button onClick={() => setActiveTool('Polygon')} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 text-left text-gray-700"><Hexagon size={16} /> Polygon</button>
-                <button onClick={() => setActiveTool('LineString')} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 text-left text-gray-700"><Minus size={16} /> LineString</button>
-                <button onClick={() => setActiveTool('Point')} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 text-left text-gray-700"><MapPin size={16} /> Point</button>
-                <button onClick={() => setActiveTool('Modify')} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 text-left text-gray-700"><PenTool size={16} /> Modify</button>
-                <div className="h-px bg-gray-200 my-1"></div>
-                <button onClick={() => setActiveTool(activeTool === 'AddLayer' ? null : 'AddLayer')} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 text-left text-gray-700"><Database size={16} /> Add Layer</button>
-              </div>
-            </div>
+            {mode === 'admin' && (
+              <>
+                <div className="flex items-center gap-1 bg-gray-50 rounded px-3 py-1.5 cursor-pointer hover:bg-gray-100 border border-gray-300 text-gray-700 font-medium transition-colors">
+                  <span>Analysis Tools</span>
+                  <ChevronDown size={16} />
+                </div>
+                
+                <div className="relative group">
+                  <div className="flex items-center gap-1 bg-gray-50 rounded px-3 py-1.5 cursor-pointer hover:bg-gray-100 border border-gray-300 text-gray-700 font-medium transition-colors">
+                    <span>Tools</span>
+                    <ChevronDown size={16} />
+                  </div>
+                  <div className="absolute top-full right-0 mt-1 w-48 bg-white border border-gray-200 shadow-xl rounded-md hidden group-hover:flex flex-col py-1 z-50">
+                    <button onClick={() => setActiveTool('Polygon')} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 text-left text-gray-700"><Hexagon size={16} /> Polygon</button>
+                    <button onClick={() => setActiveTool('LineString')} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 text-left text-gray-700"><Minus size={16} /> LineString</button>
+                    <button onClick={() => setActiveTool('Point')} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 text-left text-gray-700"><MapPin size={16} /> Point</button>
+                    <button onClick={() => setActiveTool('Modify')} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 text-left text-gray-700"><PenTool size={16} /> Modify</button>
+                    <div className="h-px bg-gray-200 my-1"></div>
+                    <button onClick={() => setActiveTool(activeTool === 'AddLayer' ? null : 'AddLayer')} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 text-left text-gray-700"><Database size={16} /> Add Layer</button>
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="h-6 w-px bg-gray-300 mx-1"></div>
             
