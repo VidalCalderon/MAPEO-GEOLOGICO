@@ -13,7 +13,7 @@ import Draw from 'ol/interaction/Draw';
 import Modify from 'ol/interaction/Modify';
 import Snap from 'ol/interaction/Snap';
 import { fromLonLat, transformExtent } from 'ol/proj';
-import { Layers, Map as MapIcon, Compass, Globe, Navigation, MousePointer2, Settings, Crosshair, MapPin, ZoomIn, Info, Eye, EyeOff, Trash2, Box, Database, Search, Link as LinkIcon, Plus, Folder, FolderOpen, ChevronRight, ChevronDown, CheckSquare, Square, MoreVertical, MoreHorizontal, Hexagon, Minus, PenTool, GripVertical, X, ChevronUp, Sliders, TableProperties } from 'lucide-react';
+import { RefreshCw, Filter, Columns, SlidersHorizontal, Ruler, Layers, Map as MapIcon, Compass, Globe, Navigation, MousePointer2, Settings, Crosshair, MapPin, ZoomIn, Info, Eye, EyeOff, Trash2, Box, Database, Search, Link as LinkIcon, Plus, Folder, FolderOpen, ChevronRight, ChevronDown, CheckSquare, Square, MoreVertical, MoreHorizontal, Hexagon, Minus, PenTool, GripVertical, X, ChevronUp, Sliders, TableProperties } from 'lucide-react';
 import BaseLayer from 'ol/layer/Base';
 import proj4 from 'proj4';
 import { register } from 'ol/proj/proj4';
@@ -83,6 +83,8 @@ const MapComponent: React.FC<MapComponentProps> = ({ mode = 'client' }) => {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [tableData, setTableData] = useState<{title: string, headers: string[], rows: any[]} | null>(null);
   const [isLoadingTable, setIsLoadingTable] = useState(false);
+  const [isTableMinimized, setIsTableMinimized] = useState(true);
+  const [tableHeight, setTableHeight] = useState(256);
 
   // Estados para la herramienta de Añadir Capas
   const [addLayerTab, setAddLayerTab] = useState<'search' | 'url'>('url');
@@ -659,6 +661,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ mode = 'client' }) => {
     if (!item.layer) return;
     setIsLoadingTable(true);
     setTableData(null);
+    setIsTableMinimized(false);
 
     const layerTitle = item.title;
     let arcgisUrl = item.layer.get('originalUrl') || item.layer.get('url') || '';
@@ -696,6 +699,8 @@ const MapComponent: React.FC<MapComponentProps> = ({ mode = 'client' }) => {
           if (params.LAYERS && String(params.LAYERS).startsWith('show:')) {
               const layerId = String(params.LAYERS).split(':')[1];
               url = url + '/' + layerId;
+          } else {
+              url = url + '/0';
           }
       }
 
@@ -943,13 +948,12 @@ const MapComponent: React.FC<MapComponentProps> = ({ mode = 'client' }) => {
         
         
 
-        <div className="flex-1 relative bg-gray-100 flex flex-col overflow-hidden">
+        <div className="flex-1 relative bg-gray-100 flex flex-col overflow-hidden min-w-0">
           
-          <div className="flex-1 relative">
+          <div className="flex-1 relative min-w-0">
             <div ref={mapElement} className="absolute inset-0" />
             
             
-
             <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
               <button 
                 onClick={() => setIsLayerListOpen(!isLayerListOpen)} 
@@ -973,9 +977,17 @@ const MapComponent: React.FC<MapComponentProps> = ({ mode = 'client' }) => {
               </button>
               <button 
                 className="bg-white p-2 rounded shadow-md border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors"
-                title="Brújula / Navegación"
+                title="Brújula / Restablecer Norte"
+                onClick={() => mapRef.current?.getView().animate({ rotation: 0, duration: 500 })}
               >
                 <Compass size={20} />
+              </button>
+              <button 
+                className={`p-2 rounded shadow-md border transition-colors ${activeTool === 'LineString' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-blue-600'}`}
+                title="Medición (Regla)"
+                onClick={() => setActiveTool(activeTool === 'LineString' ? null : 'LineString')}
+              >
+                <Ruler size={20} />
               </button>
             </div>
 
@@ -1046,61 +1058,114 @@ const MapComponent: React.FC<MapComponentProps> = ({ mode = 'client' }) => {
             )}
           </div>
           
-          {(tableData || isLoadingTable) && (
-            <div className="h-64 bg-white border-t border-gray-300 flex flex-col z-10 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-              <div className="h-1.5 w-full bg-gray-200 cursor-row-resize flex justify-center items-center hover:bg-gray-300">
-                <div className="w-8 h-0.5 bg-gray-400 rounded-full"></div>
-              </div>
-              
-              <div className="flex items-center justify-between px-4 py-1.5 border-b border-gray-200 bg-gray-50">
-                <div className="flex items-center gap-4 text-xs font-semibold text-gray-600">
-                  <span className="text-gray-800 border-b-2 border-blue-500 pb-1 flex items-center gap-2">
-                    <TableProperties size={14} />
-                    {isLoadingTable ? 'Cargando datos...' : (tableData?.title || 'TABLA DE ATRIBUTOS').toUpperCase()}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-500">
-                  <button className="hover:text-gray-800"><ChevronUp size={16} /></button>
-                  <button onClick={() => setTableData(null)} className="hover:text-gray-800"><X size={16} /></button>
-                </div>
-              </div>
 
-              <div className="flex-1 overflow-auto bg-white custom-scrollbar relative">
-                {isLoadingTable ? (
-                  <div className="absolute inset-0 flex items-center justify-center bg-white/50">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+          {/* TABLA DE ATRIBUTOS (SIEMPRE RENDERIZADA) */}
+          <div 
+            className="bg-white flex flex-col z-20 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] transition-all duration-300 relative border-t border-gray-300"
+            style={{ height: isTableMinimized ? '0px' : `${tableHeight}px` }}
+          >
+            {/* PESTAÑA PARA EXPANDIR (SOLO VISIBLE CUANDO ESTÁ MINIMIZADO) */}
+            {isTableMinimized && (
+              <div 
+                className="absolute -top-6 left-1/2 -translate-x-1/2 h-6 w-16 bg-[#111111] rounded-t-lg flex items-center justify-center cursor-pointer hover:bg-black transition-colors z-30"
+                onClick={() => setIsTableMinimized(false)}
+                title="Expandir tabla"
+              >
+                <ChevronUp size={16} className="text-white" />
+              </div>
+            )}
+
+            {/* CONTENIDO DE LA TABLA (CUANDO NO ESTÁ MINIMIZADO) */}
+            {!isTableMinimized && (
+              <>
+                {/* PESTAÑA PARA COLAPSAR (CUANDO ESTÁ EXPANDIDO) */}
+                <div 
+                  className="absolute -top-6 left-1/2 -translate-x-1/2 h-6 w-16 bg-[#111111] rounded-t-lg flex items-center justify-center cursor-pointer hover:bg-black transition-colors z-30"
+                  onClick={() => setIsTableMinimized(true)}
+                  title="Minimizar tabla"
+                >
+                  <ChevronDown size={16} className="text-white" />
+                </div>
+
+                {/* Drag Handle */}
+                <div 
+                  className="h-2 w-full bg-gray-200 cursor-row-resize flex justify-center items-center hover:bg-gray-300"
+                  onMouseDown={(e) => {
+                    const startY = e.clientY;
+                    const startHeight = tableHeight;
+                    const handleMouseMove = (moveEvent: any) => {
+                      const deltaY = startY - moveEvent.clientY;
+                      const newHeight = Math.max(100, Math.min(window.innerHeight - 200, startHeight + deltaY));
+                      setTableHeight(newHeight);
+                    };
+                    const handleMouseUp = () => {
+                      document.removeEventListener('mousemove', handleMouseMove);
+                      document.removeEventListener('mouseup', handleMouseUp);
+                    };
+                    document.addEventListener('mousemove', handleMouseMove);
+                    document.addEventListener('mouseup', handleMouseUp);
+                  }}
+                >
+                  <div className="w-8 h-1 bg-gray-400 rounded-full pointer-events-none"></div>
+                </div>
+                
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-1.5 border-b border-gray-200 bg-gray-50">
+                  <div className="flex items-center gap-4 text-xs font-semibold text-gray-600">
+                    <span className="text-gray-800 border-b-2 border-blue-500 pb-1 flex items-center gap-2">
+                      {isLoadingTable ? 'Cargando datos...' : (tableData?.title || 'TABLA DE ATRIBUTOS').toUpperCase()}
+                    </span>
                   </div>
-                ) : tableData && tableData.rows.length > 0 ? (
-                  <table className="w-full text-xs text-left whitespace-nowrap">
-                    <thead className="bg-gray-100 text-gray-600 sticky top-0 border-b border-gray-200 shadow-sm z-10">
-                      <tr>
-                        {tableData.headers.map((h, i) => (
-                          <th key={i} className="px-3 py-2 font-medium border-r border-gray-200">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 text-gray-700">
-                      {tableData.rows.map((row, rIndex) => (
-                        <tr key={rIndex} className={`hover:bg-blue-50 ${rIndex % 2 === 1 ? 'bg-gray-50/50' : ''}`}>
-                          {tableData.headers.map((h, cIndex) => (
-                            <td key={cIndex} className="px-3 py-1.5 border-r border-gray-100 max-w-[200px] truncate" title={String(row[h])}>
-                              {row[h] !== null && row[h] !== undefined ? String(row[h]) : ''}
-                            </td>
+                  <div className="flex items-center gap-3 text-gray-400">
+                    <button className="hover:text-gray-800" title="Actualizar"><RefreshCw size={14} /></button>
+                    <button className="hover:text-gray-800" title="Filtrar"><Filter size={14} /></button>
+                    <button className="hover:text-gray-800" title="Mostrar/Ocultar columnas"><Columns size={14} /></button>
+                    <button className="hover:text-gray-800" title="Opciones"><SlidersHorizontal size={14} /></button>
+                    <div className="w-px h-4 bg-gray-300 mx-1"></div>
+                    <button onClick={() => setIsTableMinimized(true)} className="hover:text-gray-800" title="Minimizar"><ChevronDown size={16} /></button>
+                    <button onClick={() => {setTableData(null); setIsTableMinimized(true);}} className="hover:text-gray-800" title="Cerrar"><X size={16} /></button>
+                  </div>
+                </div>
+
+                {/* Contenido (Tabla o Loading) */}
+                <div className="flex-1 overflow-auto bg-white custom-scrollbar relative">
+                  {isLoadingTable ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/50">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+                    </div>
+                  ) : tableData && tableData.rows.length > 0 ? (
+                    <table className="w-full text-xs text-left whitespace-nowrap">
+                      <thead className="bg-gray-100 text-gray-600 sticky top-0 border-b border-gray-200 shadow-sm z-10">
+                        <tr>
+                          {tableData.headers.map((h, i) => (
+                            <th key={i} className="px-3 py-2 font-medium border-r border-gray-200">{h}</th>
                           ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="p-4 text-center text-sm text-gray-500">No hay datos para mostrar</div>
-                )}
-              </div>
-              
-              <div className="bg-gray-100 border-t border-gray-200 px-3 py-1 text-[10px] text-gray-500 flex justify-between">
-                <span>Total: {tableData?.rows.length || 0} | Selección: 0</span>
-              </div>
-            </div>
-          )}
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 text-gray-700">
+                        {tableData.rows.map((row, rIndex) => (
+                          <tr key={rIndex} className={`hover:bg-blue-50 ${rIndex % 2 === 1 ? 'bg-gray-50/50' : ''}`}>
+                            {tableData.headers.map((h, cIndex) => (
+                              <td key={cIndex} className="px-3 py-1.5 border-r border-gray-100 max-w-[200px] truncate" title={String(row[h])}>
+                                {row[h] !== null && row[h] !== undefined ? String(row[h]) : ''}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="p-4 text-center text-sm text-gray-500">No hay datos para mostrar</div>
+                  )}
+                </div>
+                
+                {/* Footer */}
+                <div className="bg-gray-100 border-t border-gray-200 px-3 py-1 text-[10px] text-gray-500 flex justify-between shrink-0">
+                  <span>Total: {tableData?.rows.length || 0} | Selección: 0</span>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1108,7 +1173,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ mode = 'client' }) => {
         title="Capas del mapa" 
         isOpen={isLayerListOpen} 
         onClose={() => setIsLayerListOpen(false)}
-        defaultPosition={{ x: mode === 'client' ? 24 : (window.innerWidth > 400 ? window.innerWidth - 380 : 16), y: mode === 'client' ? 120 : 16 }}
+        defaultPosition={{ x: 60, y: 120 }}
       >
         <div className="flex flex-col h-full bg-white">
           <div className="p-2 border-b border-gray-200">
