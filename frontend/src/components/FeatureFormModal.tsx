@@ -3,6 +3,18 @@ import { X } from 'lucide-react';
 import Feature from 'ol/Feature';
 import { POLYGON_RULES } from '../utils/formRules';
 
+function getAvailableLayers() {
+  try {
+    const raw = localStorage.getItem('admin_layers');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Solo tomamos grupos (que el usuario usa como capas lógicas en su árbol)
+      return parsed.filter((l: any) => l.type === 'group' && !l.parentId);
+    }
+  } catch (e) {}
+  return [];
+}
+
 interface FeatureFormModalProps {
   feature: Feature | null;
   geometryType: string;
@@ -21,6 +33,27 @@ const STATIC_DOMAINS = {
 const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryType, onSave, onCancel }) => {
   const [formData, setFormData] = useState<any>({});
   const [errors, setErrors] = useState<any>({});
+  const availableLayers = getAvailableLayers();
+  const defaultWorkspace = availableLayers.length === 1 ? availableLayers[0].id : (localStorage.getItem('active_workspace') || '');
+  const [activeWorkspace, setActiveWorkspace] = useState(defaultWorkspace);
+
+  const [position, setPosition] = useState({ x: window.innerWidth / 2 - 250, y: window.innerHeight / 2 - 300 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragRef = React.useRef({ startX: 0, startY: 0, initialX: 0, initialY: 0 });
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    setIsDragging(true);
+    dragRef.current = { startX: e.clientX, startY: e.clientY, initialX: position.x, initialY: position.y };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging) return;
+    setPosition({ x: dragRef.current.initialX + (e.clientX - dragRef.current.startX), y: dragRef.current.initialY + (e.clientY - dragRef.current.startY) });
+  };
+  const handlePointerUp = (e: React.PointerEvent) => {
+    setIsDragging(false);
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
   
   // Categoría principal para Polígonos
   const [polygonCategory, setPolygonCategory] = useState<'Litologia' | 'Alteracion' | 'Mineralizacion'>('Litologia');
@@ -68,11 +101,18 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
     : {};
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
+    <div 
+      className="fixed z-[9999] bg-white rounded-lg shadow-2xl flex flex-col border border-gray-300"
+      style={{ left: position.x, top: position.y, width: '500px', maxHeight: '90vh' }}
+    >
         
         {/* HEADER */}
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 rounded-t-lg">
+        <div 
+        className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-100 rounded-t-lg cursor-move select-none"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+      >
           <h2 className="text-xl font-bold text-gray-800">
             {geometryType === 'Point' ? 'Estructura (Punto)' : 
              geometryType === 'LineString' ? 'Estructura (Línea)' : 
@@ -85,6 +125,27 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
 
         {/* BODY */}
         <div className="p-6 overflow-y-auto flex-1 space-y-4">
+          
+          {availableLayers.length > 1 && (
+            <div className="mb-3 p-2 bg-indigo-50/50 border border-indigo-100 rounded flex items-center gap-3">
+              <div className="shrink-0">
+                <label className="block text-xs font-bold text-indigo-900">Proyecto / Escala</label>
+              </div>
+              <select 
+                value={activeWorkspace} 
+                onChange={e => {
+                  setActiveWorkspace(e.target.value);
+                  localStorage.setItem('active_workspace', e.target.value);
+                }}
+                className="flex-1 text-xs border border-indigo-200 rounded p-1 focus:ring-1 focus:ring-indigo-500 outline-none font-semibold text-indigo-800 bg-white"
+              >
+                <option value="">-- Seleccione --</option>
+                {availableLayers.map((l: any) => (
+                  <option key={l.id} value={l.id}>{l.title}</option>
+                ))}
+              </select>
+            </div>
+          )}
           
           {geometryType === 'Polygon' && (
             <div className="mb-4">
@@ -216,7 +277,6 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
           </button>
         </div>
       </div>
-    </div>
   );
 };
 

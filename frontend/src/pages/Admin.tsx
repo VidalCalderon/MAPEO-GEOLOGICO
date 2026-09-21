@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import MapComponent from '../components/MapComponent';
 import type { AdminLayerNode } from '../types/layer';
-import { Plus, Layers, Map as MapIcon, Settings, Eye, EyeOff, Folder, FolderOpen, FileText, Trash2, ChevronRight, ChevronDown, Edit2, GripVertical } from 'lucide-react';
+import { Plus, Layers, Map as MapIcon, Settings, Eye, EyeOff, Folder, FolderOpen, FileText, Trash2, ChevronRight, ChevronDown, Edit2, GripVertical, List } from 'lucide-react';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -9,9 +9,9 @@ const Admin: React.FC = () => {
   const [adminLayers, setAdminLayers] = useState<AdminLayerNode[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('admin_auth') === 'true');
   const [password, setPassword] = useState('');
-  const [activeTab, setActiveTab] = useState<'layers' | 'add' | 'basemap' | 'settings'>('layers');
+  const [activeTab, setActiveTab] = useState<'layers' | 'maplayers' | 'add' | 'basemap' | 'settings'>('layers');
   
-  const [addMode, setAddMode] = useState<'url' | 'file'>('url');
+  const [addMode, setAddMode] = useState<'url' | 'file' | 'template'>('url');
   const [newUrl, setNewUrl] = useState('');
   const [newTitle, setNewTitle] = useState('');
   const [newFile, setNewFile] = useState<File | null>(null);
@@ -336,6 +336,9 @@ const Admin: React.FC = () => {
         <button onClick={() => setActiveTab('add')} className={`p-3 rounded-lg hover:bg-gray-700 transition ${activeTab === 'add' ? 'bg-blue-600 text-white' : 'text-gray-400'}`} title="Añadir">
           <Plus size={24} />
         </button>
+        <button onClick={() => setActiveTab('maplayers')} className={`p-3 rounded-lg hover:bg-gray-700 transition ${activeTab === 'maplayers' ? 'bg-blue-600 text-white' : 'text-gray-400'}`} title="Capas del Mapa">
+          <List size={24} />
+        </button>
         <button onClick={() => setActiveTab('layers')} className={`p-3 rounded-lg hover:bg-gray-700 transition ${activeTab === 'layers' ? 'bg-blue-600 text-white' : 'text-gray-400'}`} title="Capas">
           <Layers size={24} />
         </button>
@@ -348,14 +351,12 @@ const Admin: React.FC = () => {
         </button>
       </div>
 
-      <div className="w-80 bg-white shadow-2xl z-20 flex flex-col border-r border-gray-200">
+      {['add', 'layers', 'basemap', 'settings'].includes(activeTab) && <div className="w-80 bg-white shadow-2xl z-20 flex flex-col border-r border-gray-200">
         {activeTab === 'layers' && (
           <>
             <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
               <h2 className="text-lg font-bold text-gray-800">Capas</h2>
-              <button onClick={handleAddGroup} className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-2 rounded transition">
-                + Grupo
-              </button>
+              <button onClick={handleAddGroup} className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-2 rounded transition">+ Grupo</button>
             </div>
             <div 
               className="flex-1 overflow-y-auto pb-20"
@@ -369,7 +370,7 @@ const Admin: React.FC = () => {
               }}
               onDrop={() => {
                 if (dragOverId === 'root' && draggedId) {
-                  const newLayers = [...adminLayers];
+                  const newLayers: any[] = [...adminLayers];
                   const draggedIndex = newLayers.findIndex(l => l.id === draggedId);
                   if (draggedIndex > -1) {
                     const item = newLayers.splice(draggedIndex, 1)[0];
@@ -399,15 +400,28 @@ const Admin: React.FC = () => {
               <div className="flex border border-gray-300 rounded overflow-hidden">
                 <button onClick={() => setAddMode('url')} className={`flex-1 py-1 text-sm font-semibold ${addMode === 'url' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>URL</button>
                 <button onClick={() => setAddMode('file')} className={`flex-1 py-1 text-sm font-semibold ${addMode === 'file' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>Archivo</button>
+                <button onClick={() => setAddMode('template')} className={`flex-1 py-1 text-sm font-semibold ${addMode === 'template' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>Plantilla</button>
               </div>
 
               {addMode === 'url' ? (
                 <input type="text" placeholder="URL (ej: .../MapServer)" value={newUrl} onChange={e => setNewUrl(e.target.value)} className="w-full bg-white border border-gray-300 rounded p-2 text-sm focus:border-blue-500 outline-none" />
-              ) : (
+              ) : addMode === 'file' ? (
                 <div>
                   <input type="file" onChange={e => setNewFile(e.target.files?.[0] || null)} className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
                   <p className="text-[11px] text-gray-400 mt-1.5 ml-1">Soporta: .shp (en .zip), .geojson, .json, .kml, .kmz, .tif</p>
                 </div>
+              ) : (
+                <select value={newUrl} onChange={e => {
+                  setNewUrl(e.target.value);
+                  if(!newTitle) setNewTitle(e.target.value);
+                }} className="w-full bg-white border border-gray-300 rounded p-2 text-sm focus:border-blue-500 outline-none">
+                  <option value="">Seleccione plantilla editable...</option>
+                  <option value="Litología">Litología</option>
+                  <option value="Alteración">Alteración</option>
+                  <option value="Mineralización">Mineralización</option>
+                  <option value="Estructuras (Líneas)">Estructuras (Líneas)</option>
+                  <option value="Estructuras (Puntos)">Estructuras (Puntos)</option>
+                </select>
               )}
 
               <input type="text" placeholder="Nombre para mostrar" value={newTitle} onChange={e => setNewTitle(e.target.value)} className="w-full bg-white border border-gray-300 rounded p-2 text-sm focus:border-blue-500 outline-none" />
@@ -430,13 +444,13 @@ const Admin: React.FC = () => {
              </button>
           </div>
         )}
-      </div>
+      </div>}
 
       <div className="flex-1 relative bg-gray-200">
         <div className="absolute top-4 right-4 z-20 bg-yellow-400 text-yellow-900 px-4 py-2 rounded-full font-bold shadow text-sm">
           MODO VISTA PREVIA (ADMIN)
         </div>
-        <MapComponent mode="admin" />
+        <MapComponent mode="admin" activeAdminTab={activeTab} />
       </div>
     </div>
   );
