@@ -691,6 +691,40 @@ const MapComponent: React.FC<MapComponentProps> = ({
       typeof targetLayer.getSource === "function"
         ? targetLayer.getSource()
         : null;
+
+    // Si es un grupo de edición (sin fuente propia), revisar si hay dibujos asociados en sourceRef
+    if (!source && targetLayer.get("isGroup") && sourceRef.current) {
+      const features = sourceRef.current.getFeatures();
+      if (features.length > 0) {
+        let groupExtent = ol.extent.createEmpty();
+        let foundAny = false;
+        
+        features.forEach((f) => {
+          const props = f.getProperties();
+          const rootWorkspaceId = props.workspace;
+          
+          let catTitle = '';
+          switch(props.Categoria) {
+            case 'Litologia': catTitle = 'Litología'; break;
+            case 'Alteracion': catTitle = 'Alteración'; break;
+            case 'Mineralizacion': catTitle = 'Mineralización'; break;
+            case 'LineString': catTitle = 'Estructuras (Líneas)'; break;
+            case 'Point': catTitle = 'Estructuras (Puntos)'; break;
+          }
+
+          // Pertenece a este grupo si el id coincide (root) o el titulo coincide (subgrupo)
+          if (targetLayer.get("id") === rootWorkspaceId || targetLayer.get("title") === catTitle) {
+            ol.extent.extend(groupExtent, f.getGeometry()!.getExtent());
+            foundAny = true;
+          }
+        });
+
+        if (foundAny) {
+          mapRef.current.getView().fit(groupExtent, { duration: 1000, padding: [50, 50, 50, 50] });
+          return;
+        }
+      }
+    }
     let arcgisUrl =
       targetLayer.get("originalUrl") || targetLayer.get("url") || "";
     if (!arcgisUrl && source) {
@@ -1053,6 +1087,43 @@ const MapComponent: React.FC<MapComponentProps> = ({
       }
     }
 
+    if (!source && item.isGroup && sourceRef.current) {
+      const allFeatures = sourceRef.current.getFeatures();
+      const groupFeatures = allFeatures.filter((f) => {
+        const props = f.getProperties();
+        const rootWorkspaceId = props.workspace;
+        let catTitle = '';
+        switch(props.Categoria) {
+          case 'Litologia': catTitle = 'Litología'; break;
+          case 'Alteracion': catTitle = 'Alteración'; break;
+          case 'Mineralizacion': catTitle = 'Mineralización'; break;
+          case 'LineString': catTitle = 'Estructuras (Líneas)'; break;
+          case 'Point': catTitle = 'Estructuras (Puntos)'; break;
+        }
+        return (item.id === rootWorkspaceId || item.title === catTitle);
+      });
+
+      if (groupFeatures.length > 0) {
+        const headerSet = new Set<string>();
+        groupFeatures.forEach((f) => {
+          Object.keys(f.getProperties()).forEach((k) => {
+             if (k !== "geometry") headerSet.add(k);
+          });
+        });
+        const headers = Array.from(headerSet);
+        
+        const rows = groupFeatures.map((f: any) => {
+          const props = f.getProperties();
+          const rowData: any = {};
+          headers.forEach((h) => (rowData[h] = props[h] !== undefined ? props[h] : ""));
+          return rowData;
+        });
+        setTableData({ title: layerTitle, headers, rows });
+        setIsLoadingTable(false);
+        return;
+      }
+    }
+
     if (
       arcgisUrl &&
       typeof arcgisUrl === "string" &&
@@ -1228,18 +1299,16 @@ const MapComponent: React.FC<MapComponentProps> = ({
             </div>
 
             <div className="flex items-center gap-0.5 pr-1">
-              {!item.isGroup && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    zoomToLayer(item.id);
-                  }}
-                  className="p-1 rounded text-gray-400 hover:bg-gray-200 hover:text-blue-600 transition-colors"
-                  title="Acercar a esta capa"
-                >
-                  <Search size={14} />
-                </button>
-              )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  zoomToLayer(item.id);
+                }}
+                className="p-1 rounded text-gray-400 hover:bg-gray-200 hover:text-blue-600 transition-colors"
+                title="Acercar a esta capa"
+              >
+                <Search size={14} />
+              </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
