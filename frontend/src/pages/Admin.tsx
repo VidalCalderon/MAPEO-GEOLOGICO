@@ -71,11 +71,16 @@ const Admin: React.FC = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(newLayers),
         });
+        const respData = await res.json().catch(()=>null);
         if (!res.ok) {
-          console.error("Error al guardar en la nube");
+          console.error("Error al guardar en la nube", respData);
+          alert("Error del servidor al guardar las capas: " + (respData?.message || res.statusText));
+        } else {
+          console.log("Guardado exitoso", respData);
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error("Fallo de conexiA3n al guardar en la nube", e);
+        alert("Fallo de conexiA3n: No se pudo conectar a guardar_capas.php");
       }
     };
 

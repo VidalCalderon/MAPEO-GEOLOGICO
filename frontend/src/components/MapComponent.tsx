@@ -396,7 +396,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
     try {
       let adminNodes = null;
       try {
-        const res = await fetch("https://gimatc.pe/capas_admin.json");
+        const res = await fetch("https://gimatc.pe/leer_capas.php");
         if (res.ok) {
           adminNodes = await res.json();
         }
