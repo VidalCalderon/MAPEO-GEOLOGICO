@@ -114,7 +114,42 @@ export const BASEMAPS = [
         maxZoom: 23,
       }),
   },
-];
+  {
+    id: "google-roadmap",
+    name: "Google Callejero",
+    getSource: () =>
+      new XYZ({
+        url: "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+        maxZoom: 23,
+      }),
+  },
+  {
+    id: "google-satellite",
+    name: "Google Satélite",
+    getSource: () =>
+      new XYZ({
+        url: "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+        maxZoom: 23,
+      }),
+  },
+  {
+    id: "google-hybrid",
+    name: "Google Híbrido",
+    getSource: () =>
+      new XYZ({
+        url: "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+        maxZoom: 23,
+      }),
+  },
+  {
+    id: "google-terrain",
+    name: "Google Terreno",
+    getSource: () =>
+      new XYZ({
+        url: "https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}",
+        maxZoom: 23,
+      }),
+  }];
 
 interface MapComponentProps {
   mode?: "client" | "admin";
