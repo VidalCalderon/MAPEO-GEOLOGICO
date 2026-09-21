@@ -170,22 +170,54 @@ const MapComponent: React.FC<MapComponentProps> = ({
     type: string;
   } | null>(null);
 
-  const isWorkspaceVisible = (map: Map, workspaceId: string): boolean => {
-    let isVisible = false; // default to false if not found
+  const isFeatureVisible = (map: Map, rootWorkspaceId: string | undefined, catWorkspaceId: string, catTitle: string): boolean => {
+    let isVisible = false; 
+    let found = false;
 
-    const findRecursive = (layersColl: any, parentVisible: boolean) => {
+    const findRecursive = (layersColl: any, parentVisible: boolean, inCorrectRoot: boolean) => {
       layersColl.forEach((layer: any) => {
+        const layerId = layer.get("id");
+        const isRoot = layerId === rootWorkspaceId;
+        const currentInCorrectRoot = inCorrectRoot || isRoot || !rootWorkspaceId;
+
         const currentlyVisible = parentVisible && layer.getVisible();
-        if (layer.get("id") === workspaceId) {
+        
+        // Match subgroup by ID or Title, but only if we are inside the correct root group (if provided)
+        if (!found && currentInCorrectRoot && (layerId === catWorkspaceId || layer.get("title") === catTitle)) {
           isVisible = currentlyVisible;
+          found = true;
         }
+        
         if (layer.getLayers && typeof layer.getLayers === 'function') {
-          findRecursive(layer.getLayers(), currentlyVisible);
+          findRecursive(layer.getLayers(), currentlyVisible, currentInCorrectRoot);
         }
       });
     };
 
-    findRecursive(map.getLayers(), true);
+    findRecursive(map.getLayers(), true, false);
+    
+    // Si no encontramos la subcapa específica (ej. Estructuras), pero tenemos un root (ej. Mapeo), 
+    // verificamos al menos si el root está encendido.
+    if (!found && rootWorkspaceId) {
+        let rootVisible = true;
+        let rootFound = false;
+        const findRoot = (layersColl: any, parentVisible: boolean) => {
+           layersColl.forEach((layer: any) => {
+               const currentlyVisible = parentVisible && layer.getVisible();
+               if (layer.get("id") === rootWorkspaceId) {
+                   rootVisible = currentlyVisible;
+                   rootFound = true;
+               }
+               if (layer.getLayers && typeof layer.getLayers === 'function') {
+                   findRoot(layer.getLayers(), currentlyVisible);
+               }
+           });
+        };
+        findRoot(map.getLayers(), true);
+        if (rootFound) return rootVisible;
+    }
+
+    if (!found) return true;
     return isVisible;
   };
 
@@ -254,26 +286,23 @@ const MapComponent: React.FC<MapComponentProps> = ({
       source: source,
       style: (feature) => {
         const props = feature.getProperties();
-        const workspaceId = props.workspace;
+        const rootWorkspaceId = props.workspace;
         
-        if (workspaceId && mapRef.current) {
-          const visible = isWorkspaceVisible(mapRef.current, workspaceId);
-          if (!visible) return undefined;
-        } else if (mapRef.current && props.Categoria) {
-          // Fallback if no workspace is saved but we have Categoria
-          let catWorkspace = '';
-          switch(props.Categoria) {
-            case 'Litologia': catWorkspace = 'grp-lito'; break;
-            case 'Alteracion': catWorkspace = 'grp-alt'; break;
-            case 'Mineralizacion': catWorkspace = 'grp-min'; break;
-            case 'LineString': catWorkspace = 'grp-est-lin'; break;
-            case 'Point': catWorkspace = 'grp-est-pt'; break;
-          }
-          if (catWorkspace) {
-            const visible = isWorkspaceVisible(mapRef.current, catWorkspace);
-            if (!visible) return undefined;
-          }
+        let catWorkspace = '';
+        let catTitle = '';
+        switch(props.Categoria) {
+          case 'Litologia': catWorkspace = 'grp-lito'; catTitle = 'Litología'; break;
+          case 'Alteracion': catWorkspace = 'grp-alt'; catTitle = 'Alteración'; break;
+          case 'Mineralizacion': catWorkspace = 'grp-min'; catTitle = 'Mineralización'; break;
+          case 'LineString': catWorkspace = 'grp-est-lin'; catTitle = 'Estructuras (Líneas)'; break;
+          case 'Point': catWorkspace = 'grp-est-pt'; catTitle = 'Estructuras (Puntos)'; break;
         }
+
+        if (mapRef.current) {
+          const visible = isFeatureVisible(mapRef.current, rootWorkspaceId, catWorkspace, catTitle);
+          if (!visible) return null;
+        }
+        
         return defaultStyle;
       },
       zIndex: 1000,
@@ -467,25 +496,23 @@ const MapComponent: React.FC<MapComponentProps> = ({
       source: source,
       style: (feature) => {
         const props = feature.getProperties();
-        const workspaceId = props.workspace;
+        const rootWorkspaceId = props.workspace;
         
-        if (workspaceId && mapRef.current) {
-          const visible = isWorkspaceVisible(mapRef.current, workspaceId);
-          if (!visible) return undefined;
-        } else if (mapRef.current && props.Categoria) {
-          let catWorkspace = '';
-          switch(props.Categoria) {
-            case 'Litologia': catWorkspace = 'grp-lito'; break;
-            case 'Alteracion': catWorkspace = 'grp-alt'; break;
-            case 'Mineralizacion': catWorkspace = 'grp-min'; break;
-            case 'LineString': catWorkspace = 'grp-est-lin'; break;
-            case 'Point': catWorkspace = 'grp-est-pt'; break;
-          }
-          if (catWorkspace) {
-            const visible = isWorkspaceVisible(mapRef.current, catWorkspace);
-            if (!visible) return undefined;
-          }
+        let catWorkspace = '';
+        let catTitle = '';
+        switch(props.Categoria) {
+          case 'Litologia': catWorkspace = 'grp-lito'; catTitle = 'Litología'; break;
+          case 'Alteracion': catWorkspace = 'grp-alt'; catTitle = 'Alteración'; break;
+          case 'Mineralizacion': catWorkspace = 'grp-min'; catTitle = 'Mineralización'; break;
+          case 'LineString': catWorkspace = 'grp-est-lin'; catTitle = 'Estructuras (Líneas)'; break;
+          case 'Point': catWorkspace = 'grp-est-pt'; catTitle = 'Estructuras (Puntos)'; break;
         }
+
+        if (mapRef.current) {
+          const visible = isFeatureVisible(mapRef.current, rootWorkspaceId, catWorkspace, catTitle);
+          if (!visible) return null;
+        }
+        
         return defaultStyle;
       },
       zIndex: 1000,

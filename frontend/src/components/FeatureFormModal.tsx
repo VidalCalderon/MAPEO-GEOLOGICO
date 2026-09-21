@@ -8,8 +8,20 @@ function getAvailableLayers() {
     const raw = localStorage.getItem('admin_layers');
     if (raw) {
       const parsed = JSON.parse(raw);
-      // Solo tomamos grupos (que el usuario usa como capas lógicas en su árbol)
-      return parsed.filter((l: any) => l.type === 'group' && !l.parentId);
+      const isEditingCategory = (title: string) => {
+        if (!title) return false;
+        const t = title.toLowerCase();
+        return t.includes('litolog') || t.includes('alteraci') || t.includes('mineralizaci') || t.includes('estructura');
+      };
+
+      return parsed.filter((l: any) => {
+        if (l.type !== 'group' || l.parentId) return false;
+        if (isEditingCategory(l.title)) return true;
+        const hasEditingChild = parsed.some((child: any) => 
+          child.parentId === l.id && child.type === 'group' && isEditingCategory(child.title)
+        );
+        return hasEditingChild;
+      });
     }
   } catch (e) {}
   return [];
