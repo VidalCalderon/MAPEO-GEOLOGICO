@@ -16,6 +16,7 @@ import Translate from "ol/interaction/Translate";
 import Modify from "ol/interaction/Modify";
 import Snap from "ol/interaction/Snap";
 import { fromLonLat, transformExtent } from "ol/proj";
+import { createEmpty, extend } from "ol/extent";
 import Style from "ol/style/Style";
 import Fill from "ol/style/Fill";
 import Stroke from "ol/style/Stroke";
@@ -300,7 +301,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
 
         if (mapRef.current) {
           const visible = isFeatureVisible(mapRef.current, rootWorkspaceId, catWorkspace, catTitle);
-          if (!visible) return null;
+          if (!visible) return undefined;
         }
         
         return defaultStyle;
@@ -510,7 +511,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
 
         if (mapRef.current) {
           const visible = isFeatureVisible(mapRef.current, rootWorkspaceId, catWorkspace, catTitle);
-          if (!visible) return null;
+          if (!visible) return undefined;
         }
         
         return defaultStyle;
@@ -696,7 +697,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
     if (!source && targetLayer.get("isGroup") && sourceRef.current) {
       const features = sourceRef.current.getFeatures();
       if (features.length > 0) {
-        let groupExtent = ol.extent.createEmpty();
+        let groupExtent = createEmpty();
         let foundAny = false;
         
         features.forEach((f) => {
@@ -714,7 +715,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
 
           // Pertenece a este grupo si el id coincide (root) o el titulo coincide (subgrupo)
           if (targetLayer.get("id") === rootWorkspaceId || targetLayer.get("title") === catTitle) {
-            ol.extent.extend(groupExtent, f.getGeometry()!.getExtent());
+            extend(groupExtent, f.getGeometry()!.getExtent());
             foundAny = true;
           }
         });
