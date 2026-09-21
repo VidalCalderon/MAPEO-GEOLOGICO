@@ -171,18 +171,21 @@ const MapComponent: React.FC<MapComponentProps> = ({
   } | null>(null);
 
   const isWorkspaceVisible = (map: Map, workspaceId: string): boolean => {
-    let isVisible = true;
-    const findRecursive = (layersColl: any) => {
+    let isVisible = false; // default to false if not found
+
+    const findRecursive = (layersColl: any, parentVisible: boolean) => {
       layersColl.forEach((layer: any) => {
+        const currentlyVisible = parentVisible && layer.getVisible();
         if (layer.get("id") === workspaceId) {
-          isVisible = layer.getVisible();
+          isVisible = currentlyVisible;
         }
         if (layer.getLayers && typeof layer.getLayers === 'function') {
-          findRecursive(layer.getLayers());
+          findRecursive(layer.getLayers(), currentlyVisible);
         }
       });
     };
-    findRecursive(map.getLayers());
+
+    findRecursive(map.getLayers(), true);
     return isVisible;
   };
 
