@@ -41,8 +41,6 @@ import {
   Box,
   Database,
   Search,
-  Link as LinkIcon,
-  Plus,
   ChevronRight,
   ChevronDown,
   CheckSquare,
@@ -176,7 +174,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
   const [customLayerUrl, setCustomLayerUrl] = useState("");
   const [customLayerTitle, setCustomLayerTitle] = useState("");
   const [customLayerFile, setCustomLayerFile] = useState<File | null>(null);
-  const [addMode, setAddMode] = useState<"url" | "file">("url");
+  const [addMode, setAddMode] = useState<"url" | "file" | "template">("url");
   const [pendingFeature, setPendingFeature] = useState<{
     feature: Feature;
     type: string;
@@ -307,10 +305,12 @@ const MapComponent: React.FC<MapComponentProps> = ({
         }
 
         const featureColor = getFeatureColor(props);
+        const geomType = feature.getGeometry()?.getType();
+        const isLine = geomType === 'LineString' || geomType === 'MultiLineString' || props.Categoria === 'LineString' || props.Categoria === 'Estructura_Lineas';
         
         return new Style({
           fill: new Fill({ color: featureColor }),
-          stroke: new Stroke({ color: "#444", width: 2 }),
+          stroke: new Stroke({ color: isLine ? featureColor : "#444", width: isLine ? 3 : 2 }),
           image: new CircleStyle({
             radius: 6,
             fill: new Fill({ color: featureColor }),
@@ -518,10 +518,12 @@ const MapComponent: React.FC<MapComponentProps> = ({
         }
 
         const featureColor = getFeatureColor(props);
+        const geomType = feature.getGeometry()?.getType();
+        const isLine = geomType === 'LineString' || geomType === 'MultiLineString' || props.Categoria === 'LineString' || props.Categoria === 'Estructura_Lineas';
         
         return new Style({
           fill: new Fill({ color: featureColor }),
-          stroke: new Stroke({ color: "#444", width: 2 }),
+          stroke: new Stroke({ color: isLine ? featureColor : "#444", width: isLine ? 3 : 2 }),
           image: new CircleStyle({
             radius: 6,
             fill: new Fill({ color: featureColor }),
@@ -1747,15 +1749,12 @@ const MapComponent: React.FC<MapComponentProps> = ({
               </button>
             </div>
 
-            {activeTool === "AddLayer" && (
+              {activeTool === "AddLayer" && (
               <div
-                className={`absolute ${mode === "admin" ? "left-4 top-1/4" : "right-4 top-4"} bg-white rounded-xl shadow-2xl border border-gray-200 w-80 text-gray-800 flex flex-col overflow-hidden z-40`}
+                className={`absolute ${mode === "admin" ? "left-4 top-1/4" : "right-4 top-4"} bg-white shadow-xl border border-gray-200 w-80 text-gray-800 flex flex-col z-40`}
               >
-                <div className="bg-amber-50 p-4 border-b border-amber-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Database className="text-amber-600" size={20} />
-                    <h3 className="font-bold text-gray-800">Añadir Datos</h3>
-                  </div>
+                <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                  <h3 className="font-bold text-[#002244] text-lg">Añadir Datos</h3>
                   <button
                     onClick={() => setActiveTool(null)}
                     className="text-gray-400 hover:text-gray-700"
@@ -1764,65 +1763,56 @@ const MapComponent: React.FC<MapComponentProps> = ({
                   </button>
                 </div>
                 <div className="flex flex-col">
-                  <div className="flex border-b border-gray-200">
+                  <div className="flex border-b border-gray-200 bg-gray-50 p-2 gap-1">
                     <button
-                      className={`flex-1 py-2 text-xs font-medium text-center ${addMode === "url" ? "border-b-2 border-amber-500 text-amber-700 bg-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"}`}
+                      className={`flex-1 py-1.5 text-sm rounded border ${addMode === "url" ? "bg-white text-blue-600 font-bold border-gray-200 shadow-sm" : "border-transparent text-gray-500 hover:bg-gray-100"}`}
                       onClick={() => setAddMode("url")}
                     >
-                      <div className="flex items-center justify-center gap-1">
-                        <LinkIcon size={14} /> URL
-                      </div>
+                      URL
                     </button>
                     <button
-                      className={`flex-1 py-2 text-xs font-medium text-center ${addMode === "file" ? "border-b-2 border-amber-500 text-amber-700 bg-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"}`}
+                      className={`flex-1 py-1.5 text-sm rounded border ${addMode === "file" ? "bg-white text-blue-600 font-bold border-gray-200 shadow-sm" : "border-transparent text-gray-500 hover:bg-gray-100"}`}
                       onClick={() => setAddMode("file")}
                     >
-                      <div className="flex items-center justify-center gap-1">
-                        <Database size={14} /> Archivo
-                      </div>
+                      Archivo
+                    </button>
+                    <button
+                      className={`flex-1 py-1.5 text-sm rounded border ${addMode === "template" ? "bg-white text-blue-600 font-bold border-gray-200 shadow-sm" : "border-transparent text-gray-500 hover:bg-gray-100"}`}
+                      onClick={() => setAddMode("template")}
+                    >
+                      Plantilla
                     </button>
                   </div>
                   <div className="p-4">
                     {addMode === "url" && (
                       <div className="space-y-4">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-600 mb-1">
-                            Enlace del servicio
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="https://..."
-                            value={customLayerUrl}
-                            onChange={(e) => setCustomLayerUrl(e.target.value)}
-                            className="w-full text-sm p-2 border border-gray-300 rounded focus:ring-2 focus:ring-amber-500 outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-600 mb-1">
-                            Nombre (opcional)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="Mi Mapa"
-                            value={customLayerTitle}
-                            onChange={(e) =>
-                              setCustomLayerTitle(e.target.value)
-                            }
-                            className="w-full text-sm p-2 border border-gray-300 rounded focus:ring-2 focus:ring-amber-500 outline-none"
-                          />
-                        </div>
+                        <input
+                          type="text"
+                          placeholder="URL (ej: .../MapServer)"
+                          value={customLayerUrl}
+                          onChange={(e) => setCustomLayerUrl(e.target.value)}
+                          className="w-full text-sm p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Nombre para mostrar"
+                          value={customLayerTitle}
+                          onChange={(e) => setCustomLayerTitle(e.target.value)}
+                          className="w-full text-sm p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
+                        />
+                        <p className="text-xs text-gray-500">Se añadirá en: <strong>Raíz (Root)</strong></p>
                         <button
                           onClick={handleAddCustomLayer}
                           disabled={!customLayerUrl}
-                          className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 px-4 rounded transition disabled:opacity-50"
+                          className="w-full bg-[#165ef0] hover:bg-blue-600 text-white font-bold py-2 rounded transition disabled:opacity-50"
                         >
-                          <Plus size={18} /> Añadir al Mapa
+                          Añadir al Visor
                         </button>
                       </div>
                     )}
                     {addMode === "file" && (
                       <div className="space-y-4">
-                        <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded p-6 text-center cursor-pointer relative hover:border-amber-500 transition-colors">
+                        <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded p-6 text-center cursor-pointer relative hover:border-[#165ef0] transition-colors">
                           <input
                             type="file"
                             onChange={(e) =>
@@ -1831,7 +1821,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                           />
                           {customLayerFile ? (
-                            <p className="text-sm text-amber-600 font-bold break-all">
+                            <p className="text-sm text-blue-600 font-bold break-all">
                               {customLayerFile.name}
                             </p>
                           ) : (
@@ -1843,17 +1833,21 @@ const MapComponent: React.FC<MapComponentProps> = ({
                         <button
                           onClick={handleAddCustomLayer}
                           disabled={!customLayerFile}
-                          className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 px-4 rounded transition disabled:opacity-50"
+                          className="w-full bg-[#165ef0] hover:bg-blue-600 text-white font-bold py-2 rounded transition disabled:opacity-50"
                         >
-                          <Plus size={18} /> Procesar
+                          Añadir al Visor
                         </button>
+                      </div>
+                    )}
+                    {addMode === "template" && (
+                      <div className="space-y-4 text-center py-4 text-gray-500 text-sm">
+                         <p>Las plantillas de datos estarán disponibles próximamente.</p>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
             )}
-
             {activeTool === "Basemap" && (
               <div
                 className={`absolute ${mode === "admin" ? "left-4 top-1/2" : "right-4 top-4"} bg-white p-4 rounded-xl shadow-2xl border border-gray-200 w-64 text-gray-800 z-40`}
