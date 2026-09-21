@@ -1240,8 +1240,6 @@ const MapComponent: React.FC<MapComponentProps> = ({
       </div>
 
       <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-end px-4 gap-3 z-30 shrink-0 shadow-sm text-sm">
-        {mode === "admin" && (
-          <>
             <div className="flex items-center gap-1 bg-gray-50 rounded px-3 py-1.5 cursor-pointer hover:bg-gray-100 border border-gray-300 text-gray-700 font-medium transition-colors">
               <span>Analysis Tools</span>
               <ChevronDown size={16} />
@@ -1296,8 +1294,6 @@ const MapComponent: React.FC<MapComponentProps> = ({
                 </button>
               </div>
             </div>
-          </>
-        )}
 
         <button
           onClick={saveServerDrawings}
