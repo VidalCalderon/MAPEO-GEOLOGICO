@@ -392,19 +392,31 @@ const MapComponent: React.FC<MapComponentProps> = ({
       console.error("Error cargando capas de usuario:", e);
     }
 
-    // 2. CARGAR CAPAS DE ADMINISTRADOR (Árbol)
+        // 2. CARGAR CAPAS DE ADMINISTRADOR (A?rbol) DESDE LA NUBE
     try {
-      const adminSaved = localStorage.getItem("admin_layers");
-      if (adminSaved) {
-        const adminNodes = JSON.parse(adminSaved);
-        if (Array.isArray(adminNodes)) {
-          const { buildLayerTree } = await import("../utils/layerBuilder");
-          const rootLayers = await buildLayerTree(adminNodes);
-          rootLayers.forEach((layer) => map.addLayer(layer));
+      let adminNodes = null;
+      try {
+        const res = await fetch("https://gimatc.pe/capas_admin.json");
+        if (res.ok) {
+          adminNodes = await res.json();
         }
+      } catch (cloudErr) {
+        console.warn("No se pudo cargar de la nube, intentando local", cloudErr);
+      }
+      
+      // Fallback a local si falla
+      if (!adminNodes) {
+        const adminSaved = localStorage.getItem("admin_layers");
+        if (adminSaved) adminNodes = JSON.parse(adminSaved);
+      }
+
+      if (Array.isArray(adminNodes)) {
+        const { buildLayerTree } = await import("../utils/layerBuilder");
+        const rootLayers = await buildLayerTree(adminNodes);
+        rootLayers.forEach((layer) => map.addLayer(layer));
       }
     } catch (e: any) {
-      console.error("Error cargando árbol de admin:", e);
+      console.error("Error cargando Arbol de admin:", e);
     }
   };
 
@@ -498,9 +510,17 @@ const MapComponent: React.FC<MapComponentProps> = ({
     // Cargar capas personalizadas previamente guardadas
     loadSavedLayers(map);
     loadServerDrawings();
-    updateLayersList(map);
+        updateLayersList(map);
+
+    // Auto-actualizar cuando lleguen capas asincronas
+    const layerCollection = map.getLayers();
+    const handleLayerChange = () => updateLayersList(map);
+    layerCollection.on("add", handleLayerChange);
+    layerCollection.on("remove", handleLayerChange);
 
     return () => {
+      layerCollection.un("add", handleLayerChange);
+      layerCollection.un("remove", handleLayerChange);
       map.setTarget(undefined);
       mapRef.current = null;
       if (ol3dRef.current) {
