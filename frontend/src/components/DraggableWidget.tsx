@@ -45,7 +45,9 @@ const DraggableWidget: React.FC<DraggableWidgetProps> = ({
       let newY = dragRef.current.initialY + dy;
       
       if (newY < 0) newY = 0;
+      if (newY > window.innerHeight - 50) newY = window.innerHeight - 50;
       if (newX < 0) newX = 0;
+      if (newX > window.innerWidth - 100) newX = window.innerWidth - 100;
       
       setPos({ x: newX, y: newY });
     };
@@ -83,7 +85,8 @@ const DraggableWidget: React.FC<DraggableWidgetProps> = ({
         left: `${pos.x}px`, 
         top: `${pos.y}px`, 
         maxHeight: isMinimized ? 'auto' : '90vh',
-        minWidth: isMinimized ? 'auto' : '250px',
+        minWidth: isMinimized ? 'auto' : 'min(250px, 90vw)',
+        maxWidth: 'calc(100vw - 20px)',
         minHeight: isMinimized ? 'auto' : '150px',
         height: isMinimized ? 'auto' : undefined,
         resize: isMinimized ? 'none' : 'both',

@@ -60,10 +60,25 @@ const Admin: React.FC = () => {
     setAdminLayers(parsed);
   }, []);
 
-  const saveLayers = (newLayers: AdminLayerNode[]) => {
-    setAdminLayers(newLayers);
-    localStorage.setItem('admin_layers', JSON.stringify(newLayers));
-  };
+  
+    const saveLayers = async (newLayers: AdminLayerNode[]) => {
+      setAdminLayers(newLayers);
+      localStorage.setItem('admin_layers', JSON.stringify(newLayers));
+      
+      try {
+        const res = await fetch("https://gimatc.pe/guardar_capas.php", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newLayers),
+        });
+        if (!res.ok) {
+          console.error("Error al guardar en la nube");
+        }
+      } catch (e) {
+        console.error("Fallo de conexiA3n al guardar en la nube", e);
+      }
+    };
+
 
   const handleAddGroup = () => {
     const title = prompt('Nombre del nuevo grupo:');

@@ -173,7 +173,8 @@ const MapComponent: React.FC<MapComponentProps> = ({
   const modifyRef = useRef<Modify | null>(null);
   const snapRef = useRef<Snap | null>(null);
   const ol3dRef = useRef<any>(null); // Referencia a la instancia de OLCesium
-  const vectorLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+
+  const vectorLayerRef = useRef<any | null>(null);
 
   const [activeTool, setActiveTool] = useState<Tool>(null);
   const [freehandTolerance, setFreehandTolerance] = useState(5);
@@ -314,124 +315,6 @@ const MapComponent: React.FC<MapComponentProps> = ({
     }
   };
 
-  useEffect(() => {
-    const source = new VectorSource();
-    sourceRef.current = source;
-
-    const vectorLayer = new VectorLayer({
-      source: source,
-      style: (feature) => {
-        const props = feature.getProperties();
-        const rootWorkspaceId = props.workspace;
-        
-        let catWorkspace = '';
-        let catTitle = '';
-        switch(props.Categoria) {
-          case 'Litologia': catWorkspace = 'grp-lito'; catTitle = 'Litología'; break;
-          case 'Alteracion': catWorkspace = 'grp-alt'; catTitle = 'Alteración'; break;
-          case 'Mineralizacion': catWorkspace = 'grp-min'; catTitle = 'Mineralización'; break;
-          case 'LineString': catWorkspace = 'grp-est-lin'; catTitle = 'Estructuras (Líneas)'; break;
-          case 'Point': catWorkspace = 'grp-est-pt'; catTitle = 'Estructuras (Puntos)'; break;
-        }
-
-        if (mapRef.current) {
-          const visible = isFeatureVisible(mapRef.current, rootWorkspaceId, catWorkspace, catTitle);
-          if (!visible) return undefined;
-        }
-
-        const featureColor = getFeatureColor(props);
-        const geomType = feature.getGeometry()?.getType();
-        const isLine = geomType === 'LineString' || geomType === 'MultiLineString' || props.Categoria === 'LineString' || props.Categoria === 'Estructura_Lineas';
-        
-        return new Style({
-          fill: new Fill({ color: featureColor }),
-          stroke: new Stroke({ color: isLine ? featureColor : "#444", width: isLine ? 3 : 2 }),
-          image: new CircleStyle({
-            radius: 6,
-            fill: new Fill({ color: featureColor }),
-            stroke: new Stroke({ color: "#444", width: 1 }),
-          }),
-        });
-      },
-      zIndex: 1000,
-    });
-    vectorLayer.set("title", "Capa de Dibujos Geológicos");
-    vectorLayerRef.current = vectorLayer;
-
-    const baseLayer = new TileLayer({
-      source: new OSM(),
-      zIndex: 0,
-    });
-    baseLayer.set("title", "Mapa Base");
-    baseLayerRef.current = baseLayer as TileLayer<OSM | XYZ>;
-
-    const map = new Map({
-      target: mapElement.current!,
-      layers: [baseLayer, vectorLayer],
-      view: new View({
-        center: fromLonLat([-75.0, -10.0]),
-        zoom: 5,
-      }),
-    });
-
-    mapRef.current = map;
-    map.getViewport().addEventListener('contextmenu', (e: any) => {
-      e.preventDefault();
-      const feature = map.forEachFeatureAtPixel(map.getEventPixel(e), f => f);
-      if (feature) {
-        setContextMenu({ x: e.clientX, y: e.clientY, feature: feature as Feature });
-      } else {
-        setContextMenu(null);
-      }
-    });
-    map.getViewport().addEventListener('click', () => setContextMenu(null));
-
-    // Inyectar Cesium y ol en el entorno global ANTES de importar ol-cesium
-    (window as any).Cesium = Cesium;
-    (window as any).ol = ol;
-
-    // Importación dinámica para evitar el problema de "hoisting" de los imports de ES6
-    import("ol-cesium")
-      .then((module) => {
-        try {
-          const OLCesiumClass = module.default || (module as any);
-          const ol3d = new OLCesiumClass({ map: map });
-          ol3dRef.current = ol3d;
-
-          if (is3DMode) {
-            ol3d.setEnabled(true);
-          }
-        } catch (e) {
-          console.error("Error inicializando Cesium:", e);
-        }
-      })
-      .catch((err) => {
-        console.error("No se pudo cargar ol-cesium", err);
-      });
-
-    // Restaurado: Esto es lo que faltaba llamar
-    loadSavedLayers(map);
-    loadServerDrawings();
-
-    // Actualizar lista inicial
-    updateLayersList(map);
-
-    // Auto-actualizar cuando lleguen capas asíncronas
-    const layerCollection = map.getLayers();
-    const handleLayerChange = () => updateLayersList(map);
-    layerCollection.on("add", handleLayerChange);
-    layerCollection.on("remove", handleLayerChange);
-
-    return () => {
-      layerCollection.un("add", handleLayerChange);
-      layerCollection.un("remove", handleLayerChange);
-      map.setTarget(undefined);
-      mapRef.current = null;
-      if (ol3dRef.current) {
-        ol3dRef.current.setEnabled(false);
-      }
-    };
-  }, []);
 
   const updateLayersList = (map: Map) => {
     const buildTree = (layersColl: any): LayerItem[] => {
@@ -614,7 +497,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
 
     // Cargar capas personalizadas previamente guardadas
     loadSavedLayers(map);
-
+    loadServerDrawings();
     updateLayersList(map);
 
     return () => {
@@ -1548,11 +1431,11 @@ const MapComponent: React.FC<MapComponentProps> = ({
           <span className="font-bold text-2xl tracking-wider text-[#4ADE80]">
             Y
           </span>
-          <span className="font-semibold text-xl tracking-widest text-gray-100">
+          <span className="font-semibold text-sm md:text-xl tracking-wide truncate max-w-[200px] md:max-w-nonest text-gray-100">
             UMESOKA
           </span>
         </div>
-        <div className="font-bold text-[#e1c142] text-xl tracking-wide">
+        <div className="font-bold text-[#e1c142] text-sm md:text-xl tracking-wide truncate max-w-[200px] md:max-w-none">
           SISTEMA DE INTEGRACION GEOLÓGICA
         </div>
         <div>
@@ -1562,19 +1445,19 @@ const MapComponent: React.FC<MapComponentProps> = ({
         </div>
       </div>
 
-      <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-end px-4 gap-3 z-30 shrink-0 shadow-sm text-sm">
-            <div className="flex items-center gap-1 bg-gray-50 rounded px-3 py-1.5 cursor-pointer hover:bg-gray-100 border border-gray-300 text-gray-700 font-medium transition-colors">
+      <div className="h-auto min-h-[3rem] py-1.5 bg-white border-b border-gray-200 flex flex-wrap items-center justify-end px-2 md:px-4 gap-x-2 md:gap-x-3 gap-y-1 z-30 shrink-0 shadow-sm text-xs md:text-sm">
+            <div className="flex items-center gap-1 bg-gray-50 rounded px-2 md:px-3 py-1 md:py-1.5 cursor-pointer hover:bg-gray-100 border border-gray-300 text-gray-700 font-medium transition-colors">
               <span>Analysis Tools</span>
               <ChevronDown size={16} />
             </div>
 
             <div className="relative group">
-              <div className="flex items-center gap-1 bg-gray-50 rounded px-3 py-1.5 cursor-pointer hover:bg-gray-100 border border-gray-300 text-gray-700 font-medium transition-colors">
+              <div className="flex items-center gap-1 bg-gray-50 rounded px-2 md:px-3 py-1 md:py-1.5 cursor-pointer hover:bg-gray-100 border border-gray-300 text-gray-700 font-medium transition-colors">
                 <span>Tools</span>
                 <ChevronDown size={16} />
               </div>
               <div className="absolute top-full right-0 mt-0 w-48 bg-white border border-gray-200 shadow-xl rounded-md hidden group-hover:flex flex-col py-1 z-50">
-                <button onClick={() => setActiveTool("Select")} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 text-left text-gray-700"><MousePointer2 size={16} /> Select / Move</button>
+                <button onClick={() => setActiveTool("Select")} className="flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-50 text-left text-gray-700"><MousePointer2 size={16} /> Select / Move</button>
                 <button onClick={() => {
                   const tolStr = prompt("Distancia en metros entre puntos (ej. 5):", "5");
                   if (tolStr !== null) {
@@ -1582,27 +1465,27 @@ const MapComponent: React.FC<MapComponentProps> = ({
                     setFreehandTolerance(isNaN(tol) ? 5 : tol);
                     setActiveTool("FreehandPolygon");
                   }
-                }} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 text-left text-gray-700"><PenTool size={16} /> Freehand Polygon</button>
+                }} className="flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-50 text-left text-gray-700"><PenTool size={16} /> Freehand Polygon</button>
                 <button onClick={() => setActiveTool("Polygon")}
-                  className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 text-left text-gray-700"
+                  className="flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-50 text-left text-gray-700"
                 >
                   <Hexagon size={16} /> Polygon
                 </button>
                 <button
                   onClick={() => setActiveTool("LineString")}
-                  className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 text-left text-gray-700"
+                  className="flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-50 text-left text-gray-700"
                 >
                   <Minus size={16} /> LineString
                 </button>
                 <button
                   onClick={() => setActiveTool("Point")}
-                  className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 text-left text-gray-700"
+                  className="flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-50 text-left text-gray-700"
                 >
                   <MapPin size={16} /> Point
                 </button>
                 <button
                   onClick={() => setActiveTool("Modify")}
-                  className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 text-left text-gray-700"
+                  className="flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-50 text-left text-gray-700"
                 >
                   <PenTool size={16} /> Modify
                 </button>
@@ -1611,7 +1494,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
                   onClick={() =>
                     setActiveTool(activeTool === "AddLayer" ? null : "AddLayer")
                   }
-                  className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 text-left text-gray-700"
+                  className="flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-50 text-left text-gray-700"
                 >
                   <Database size={16} /> Add Layer
                 </button>
@@ -1679,7 +1562,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
 
       <div className="flex-1 w-full relative flex overflow-hidden">
         {activeAdminTab === "maplayers" && (
-          <div className="w-80 bg-white border-r border-gray-200 flex flex-col z-[30] shrink-0">
+          <div className="absolute md:relative w-64 md:w-80 h-full bg-white border-r border-gray-200 flex flex-col z-[40] shrink-0 transform transition-transform left-0 top-0">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
               <h2 className="text-lg font-bold text-gray-800">
                 Capas del Mapa
