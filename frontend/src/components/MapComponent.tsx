@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import "ol/ol.css";
 import * as ol from "ol";
 import Map from "ol/Map";
+import Overlay from "ol/Overlay";
 import View from "ol/View";
 import GeoJSON from "ol/format/GeoJSON";
 import TileLayer from "ol/layer/Tile";
@@ -17,6 +18,7 @@ import Modify from "ol/interaction/Modify";
 import Snap from "ol/interaction/Snap";
 import { fromLonLat, transformExtent } from "ol/proj";
 import { createEmpty, extend } from "ol/extent";
+import { getFeatureColor } from "../utils/colors";
 import Style from "ol/style/Style";
 import Fill from "ol/style/Fill";
 import Stroke from "ol/style/Stroke";
@@ -143,6 +145,15 @@ const MapComponent: React.FC<MapComponentProps> = ({
   const [activeTool, setActiveTool] = useState<Tool>(null);
   const [freehandTolerance, setFreehandTolerance] = useState(5);
   const [layersList, setLayersList] = useState<LayerItem[]>([]);
+  const layersListRef = useRef<LayerItem[]>([]);
+  useEffect(() => { layersListRef.current = layersList; }, [layersList]);
+
+  const [disabledPopups, setDisabledPopups] = useState<Record<string, boolean>>({});
+  const disabledPopupsRef = useRef<Record<string, boolean>>({});
+  useEffect(() => { disabledPopupsRef.current = disabledPopups; }, [disabledPopups]);
+
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [popupInfo, setPopupInfo] = useState<{ coordinate: number[], properties: any } | null>(null);
   const [isLayerListOpen, setIsLayerListOpen] = useState(true);
   const [activeBasemapId, setActiveBasemapId] = useState("osm");
   const [is3DMode, setIs3DMode] = useState(false);
@@ -274,15 +285,6 @@ const MapComponent: React.FC<MapComponentProps> = ({
     const source = new VectorSource();
     sourceRef.current = source;
 
-    const defaultStyle = new Style({
-      fill: new Fill({ color: "rgba(255, 100, 50, 0.4)" }),
-      stroke: new Stroke({ color: "#444", width: 2 }),
-      image: new CircleStyle({
-        radius: 6,
-        fill: new Fill({ color: "#ff4444" }),
-      }),
-    });
-
     const vectorLayer = new VectorLayer({
       source: source,
       style: (feature) => {
@@ -303,8 +305,18 @@ const MapComponent: React.FC<MapComponentProps> = ({
           const visible = isFeatureVisible(mapRef.current, rootWorkspaceId, catWorkspace, catTitle);
           if (!visible) return undefined;
         }
+
+        const featureColor = getFeatureColor(props);
         
-        return defaultStyle;
+        return new Style({
+          fill: new Fill({ color: featureColor }),
+          stroke: new Stroke({ color: "#444", width: 2 }),
+          image: new CircleStyle({
+            radius: 6,
+            fill: new Fill({ color: featureColor }),
+            stroke: new Stroke({ color: "#444", width: 1 }),
+          }),
+        });
       },
       zIndex: 1000,
     });
@@ -484,15 +496,6 @@ const MapComponent: React.FC<MapComponentProps> = ({
     const source = new VectorSource();
     sourceRef.current = source;
 
-    const defaultStyle = new Style({
-      fill: new Fill({ color: "rgba(255, 100, 50, 0.4)" }),
-      stroke: new Stroke({ color: "#444", width: 2 }),
-      image: new CircleStyle({
-        radius: 6,
-        fill: new Fill({ color: "#ff4444" }),
-      }),
-    });
-
     const vectorLayer = new VectorLayer({
       source: source,
       style: (feature) => {
@@ -513,8 +516,18 @@ const MapComponent: React.FC<MapComponentProps> = ({
           const visible = isFeatureVisible(mapRef.current, rootWorkspaceId, catWorkspace, catTitle);
           if (!visible) return undefined;
         }
+
+        const featureColor = getFeatureColor(props);
         
-        return defaultStyle;
+        return new Style({
+          fill: new Fill({ color: featureColor }),
+          stroke: new Stroke({ color: "#444", width: 2 }),
+          image: new CircleStyle({
+            radius: 6,
+            fill: new Fill({ color: featureColor }),
+            stroke: new Stroke({ color: "#444", width: 1 }),
+          }),
+        });
       },
       zIndex: 1000,
     });
@@ -1337,8 +1350,14 @@ const MapComponent: React.FC<MapComponentProps> = ({
                     <Trash2 size={14} /> Eliminar Capa
                   </button>
                 )}
-                <button className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 text-left w-full">
-                  <EyeOff size={14} /> Deshabilitar elemento emergente
+                <button 
+                  onClick={() => {
+                    setDisabledPopups(prev => ({ ...prev, [item.id]: !prev[item.id] }));
+                    setActiveMenuId(null);
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 text-left w-full"
+                >
+                  <EyeOff size={14} /> {disabledPopups[item.id] ? "Habilitar elemento emergente" : "Deshabilitar elemento emergente"}
                 </button>
                 <button className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 text-left w-full">
                   <Sliders size={14} /> Rango de visibilidad
@@ -1394,6 +1413,79 @@ const MapComponent: React.FC<MapComponentProps> = ({
       );
     });
   };
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+
+    const popupOverlay = new Overlay({
+      element: popupRef.current!,
+      positioning: 'bottom-center',
+      stopEvent: true,
+      offset: [0, -15],
+    });
+    map.addOverlay(popupOverlay);
+
+    const clickHandler = (e: any) => {
+      const isDrawing = document.getElementById('active-tool-marker')?.dataset.tool;
+      if (isDrawing && isDrawing !== 'Select' && isDrawing !== 'null') {
+         setPopupInfo(null);
+         popupOverlay.setPosition(undefined);
+         return;
+      }
+
+      let clickedFeature: any = null;
+      let clickedLayer: any = null;
+      map.forEachFeatureAtPixel(e.pixel, (feature, layer) => {
+        if (!clickedFeature) {
+          clickedFeature = feature;
+          clickedLayer = layer;
+        }
+      });
+
+      if (clickedFeature && clickedFeature.getProperties) {
+        let isDisabled = false;
+        
+        if (clickedLayer === vectorLayerRef.current) {
+           const props = clickedFeature.getProperties();
+           const rootItem = layersListRef.current.find(l => l.id === props.workspace);
+           const subItem = layersListRef.current.find(l => (l as any).parentId === props.workspace && l.title === props.Categoria);
+           if ((rootItem && disabledPopupsRef.current[rootItem.id]) || (subItem && disabledPopupsRef.current[subItem.id])) {
+               isDisabled = true;
+           }
+        } else {
+           const item = layersListRef.current.find(l => (l as any).layer === clickedLayer);
+           if (item && disabledPopupsRef.current[item.id]) {
+               isDisabled = true;
+           }
+        }
+
+        if (!isDisabled) {
+           const rawProps = clickedFeature.getProperties();
+           const propsToDisplay = { ...rawProps };
+           delete propsToDisplay.geometry;
+           delete propsToDisplay.workspace;
+           setPopupInfo({
+              coordinate: e.coordinate,
+              properties: propsToDisplay
+           });
+           
+           popupOverlay.setPosition(e.coordinate);
+           return;
+        }
+      }
+      
+      setPopupInfo(null);
+      popupOverlay.setPosition(undefined);
+    };
+
+    map.on('singleclick', clickHandler);
+    
+    return () => {
+      map.un('singleclick', clickHandler);
+      map.removeOverlay(popupOverlay);
+    };
+  }, [mapRef.current]);
 
   return (
     <div className="w-full h-full flex flex-col overflow-hidden bg-gray-50">
@@ -1563,9 +1655,47 @@ const MapComponent: React.FC<MapComponentProps> = ({
           </div>
         )}
 
-        <div className="flex-1 relative bg-gray-100 flex flex-col overflow-hidden min-w-0">
-          <div className="flex-1 relative min-w-0">
-            <div ref={mapElement} className="absolute inset-0" />
+          <div className="flex-1 relative bg-gray-100 flex flex-col overflow-hidden min-w-0">
+            <div className="flex-1 relative min-w-0">
+              {/* Hidden Tool Marker */}
+              <div id="active-tool-marker" data-tool={activeTool || 'null'} style={{display: 'none'}}></div>
+
+              {/* POPUP CONTAINER */}
+              <div 
+                 ref={popupRef} 
+                 className="absolute bg-white/95 backdrop-blur shadow-2xl rounded-lg border border-gray-200 text-sm w-72 pointer-events-auto transition-opacity duration-200 z-50"
+                 style={{ display: popupInfo ? 'block' : 'none', padding: '0', overflow: 'hidden' }}
+              >
+                {popupInfo && (
+                  <>
+                    <div className="bg-blue-600 px-4 py-2 flex justify-between items-center text-white">
+                      <h4 className="font-bold m-0">Detalles de la Entidad</h4>
+                      <button 
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPopupInfo(null); }}
+                        className="text-white hover:text-gray-200 p-1"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto p-4" onWheel={(e) => e.stopPropagation()}>
+                      <table className="w-full text-left border-collapse text-xs">
+                        <tbody>
+                          {Object.entries(popupInfo.properties).map(([key, value]) => (
+                            key !== 'Categoria' && key !== 'id' && (
+                              <tr key={key} className="border-b border-gray-100 last:border-0">
+                                <td className="py-2 pr-4 font-semibold text-gray-700 capitalize">{key.replace(/_/g, ' ')}</td>
+                                <td className="py-2 text-gray-600">{String(value)}</td>
+                              </tr>
+                            )
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div ref={mapElement} className="absolute inset-0" />
 
             <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
               <button

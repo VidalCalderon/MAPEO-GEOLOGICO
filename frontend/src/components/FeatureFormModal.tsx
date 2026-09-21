@@ -239,7 +239,7 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
           {geometryType === 'Polygon' && (
             <>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">TIPO DE ROCA / ALTERACIÓN</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">TIPO</label>
                 <select name="TIPO" value={formData.TIPO || ''} onChange={handleChange} className="w-full border border-gray-300 rounded p-2">
                   <option value="">Seleccione...</option>
                   {Object.keys(POLYGON_RULES[polygonCategory] || {}).map(tipo => (
