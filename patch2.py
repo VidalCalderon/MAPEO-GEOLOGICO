@@ -1,102 +1,149 @@
-import sys
+﻿import re
 
-file_path = 'd:/MAPEO-GEOLOGICO/frontend/src/components/MapComponent.tsx'
-with open(file_path, 'r', encoding='utf-8') as f:
+with open('frontend/src/components/MapComponent.tsx', 'r', encoding='utf-8') as f:
     content = f.read()
 
-render_start = content.find('  const renderUserLayerTree')
-main_return = content.find('  return (\n    <div className="w-full h-full relative flex overflow-hidden">')
+zoom_func = '''
+  const zoomToLayer = async (id: string) => {
+    try {
+      if (!mapRef.current) return;
 
-new_render = '''  const renderUserLayerTree = (nodes: LayerItem[], depth: number = 0) => {
-    let displayNodes = nodes;
-    if (depth === 0 && layerSearchQuery) {
-      const query = layerSearchQuery.toLowerCase();
-      const filterRecursive = (items: LayerItem[]): LayerItem[] => {
-        const result: LayerItem[] = [];
-        items.forEach(item => {
-          if (item.title.toLowerCase().includes(query)) {
-            result.push(item);
-          } else if (item.children) {
-            const childMatches = filterRecursive(item.children);
-            if (childMatches.length > 0) result.push({ ...item, children: childMatches });
+      let targetLayer: any = null;
+      const findLayer = (layersColl: any) => {
+        layersColl.forEach((layer: any) => {
+          if (targetLayer) return;
+          if (layer.get("id") === id) targetLayer = layer;
+          if (
+            !targetLayer &&
+            (layer.get("isGroup") === true ||
+              typeof layer.getLayers === "function") &&
+            layer.getLayers
+          ) {
+            findLayer(layer.getLayers());
           }
         });
-        return result;
       };
-      displayNodes = filterRecursive(nodes);
-    }
+      findLayer(mapRef.current.getLayers());
 
-    return displayNodes.map(item => {
-      const isExpanded = expandedGroups[item.id] !== false;
-      const hasMenuOpen = activeMenuId === item.id;
-      return (
-        <div key={item.id} className="text-[11px] select-none">
-          <div 
-            className="flex items-center justify-between p-1.5 border-b border-gray-200 bg-white hover:bg-gray-100 transition-colors relative"
-            style={{ paddingLeft: `${depth * 16 + 8}px` }}
-          >
-            <div className="flex items-center gap-1.5 overflow-hidden flex-1">
-              <div className="cursor-grab text-gray-400 hover:text-gray-600">
-                <GripVertical size={14} />
-              </div>
+      if (!targetLayer) {
+        alert("Capa no encontrada en el mapa.");
+        return;
+      }
 
-              {item.isGroup ? (
-                <button onClick={(e) => { e.stopPropagation(); toggleGroupExpanded(item.id); }} className="text-gray-600 hover:text-gray-900 focus:outline-none">
-                  {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                </button>
-              ) : (
-                <div className="w-3.5" />
-              )}
-              
-              <button onClick={() => toggleLayerVisibility(item.id)} className="text-gray-700 hover:text-black focus:outline-none ml-1">
-                {item.visible ? <CheckSquare size={14} className="text-black bg-white rounded-sm" /> : <Square size={14} className="text-gray-400" />}
-              </button>
-              
-              <span className={`truncate flex-1 text-gray-800 tracking-wide ml-1 ${item.isGroup ? 'font-medium' : ''}`} title={item.title}>{item.title.toUpperCase()}</span>
-            </div>
-            
-            <div className="flex items-center">
-              <button 
-                onClick={(e) => { e.stopPropagation(); setActiveMenuId(hasMenuOpen ? null : item.id); }} 
-                className={`p-1 rounded transition-colors ${hasMenuOpen ? 'bg-gray-200 text-black' : 'text-gray-400 hover:bg-gray-200 hover:text-gray-800'}`}
-              >
-                <MoreHorizontal size={14}/>
-              </button>
-            </div>
+      const source =
+        typeof targetLayer.getSource === "function"
+          ? targetLayer.getSource()
+          : null;
 
-            {hasMenuOpen && (
-              <div className="absolute right-0 top-8 w-56 bg-white border border-gray-200 shadow-xl rounded-sm z-50 flex flex-col py-1 text-xs text-gray-700" onClick={(e) => e.stopPropagation()}>
-                {item.isCustom && (
-                  <button onClick={() => { removeCustomLayer(item.id, item.layer); setActiveMenuId(null); }} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 text-left w-full text-red-600">
-                    <Trash2 size={12} /> Eliminar Capa
-                  </button>
-                )}
-                <div className="px-3 py-2 flex flex-col gap-1">
-                  <span className="flex items-center gap-2 font-medium text-gray-600"><Sliders size={12} /> Transparencia: {100 - item.opacity}%</span>
-                  <input 
-                    type="range" min="0" max="100" value={item.opacity} 
-                    onChange={(e) => handleOpacityChange(item.id, parseInt(e.target.value))}
-                    className="w-full h-1 bg-gray-200 rounded appearance-none cursor-pointer accent-gray-700 mt-1"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+      if (!source && targetLayer.get("isGroup") && sourceRef.current) {
+        const features = sourceRef.current.getFeatures();
+        if (features.length > 0) {
+          let groupExtent = createEmpty();
+          let foundAny = false;
           
-          {item.isGroup && isExpanded && item.children && (
-            <div>
-              {renderUserLayerTree(item.children, depth + 1)}
-            </div>
-          )}
-        </div>
-      );
-    });
-  };
+          features.forEach((f) => {
+            const props = f.getProperties();
+            const rootWorkspaceId = props.workspace;
+            
+            let catTitle = '';
+            switch(props.Categoria) {
+              case 'Litologia': catTitle = 'Litología'; break;
+              case 'Alteracion': catTitle = 'Alteración'; break;
+              case 'Mineralizacion': catTitle = 'Mineralización'; break;
+              case 'LineString': catTitle = 'Estructuras (Líneas)'; break;
+              case 'Point': catTitle = 'Estructuras (Puntos)'; break;
+            }
 
+            if (targetLayer.get("id") === rootWorkspaceId || targetLayer.get("title") === catTitle) {
+              extend(groupExtent, f.getGeometry()!.getExtent());
+              foundAny = true;
+            }
+          });
+
+          if (foundAny) {
+            mapRef.current.getView().fit(groupExtent, { duration: 1000, padding: [50, 50, 50, 50] });
+            return;
+          }
+        }
+      }
+
+      const getLayerExtent = async (layer: any): Promise<any> => {
+        if (!layer) return null;
+        let ext = typeof layer.getExtent === 'function' ? layer.getExtent() : null;
+        if (ext && ext.every(isFinite)) return ext;
+
+        const src = typeof layer.getSource === 'function' ? layer.getSource() : null;
+        if (src) {
+          if (layer.get('isGeoTIFF') && typeof src.getView === 'function') {
+             try {
+               const viewConfig = await src.getView();
+               if (viewConfig && viewConfig.extent) {
+                  let finalExt = viewConfig.extent;
+                  if (viewConfig.projection && viewConfig.projection !== "EPSG:3857") {
+                      const projCode = typeof viewConfig.projection.getCode === "function" ? viewConfig.projection.getCode() : viewConfig.projection;
+                      finalExt = transformExtent(viewConfig.extent, projCode, "EPSG:3857");
+                  }
+                  return finalExt;
+               }
+             } catch(e: any) { alert("Error obteniendo view del TIFF: " + e.message); }
+          }
+
+          if (typeof src.getExtent === 'function') {
+             ext = src.getExtent();
+             if (ext && ext.every(isFinite)) return ext;
+          }
+          
+          if (typeof src.getFeatures === 'function') {
+             const features = src.getFeatures();
+             if (features.length > 0) {
+               const vExt = createEmpty();
+               features.forEach((f: any) => {
+                 if (f.getGeometry()) extend(vExt, f.getGeometry().getExtent());
+               });
+               if (vExt && vExt.every(isFinite)) return vExt;
+             }
+          }
+        }
+
+        if (typeof layer.getLayers === 'function') {
+          const subLayers = layer.getLayers().getArray();
+          const groupExt = createEmpty();
+          let hasExt = false;
+          for (const sub of subLayers) {
+             const subExt = await getLayerExtent(sub);
+             if (subExt && subExt.every(isFinite)) {
+               extend(groupExt, subExt);
+               hasExt = true;
+             }
+          }
+          if (hasExt) return groupExt;
+        }
+        return null;
+      };
+
+      const calculatedExtent = await getLayerExtent(targetLayer);
+      if (calculatedExtent && calculatedExtent.every(isFinite)) {
+        mapRef.current!.getView().fit(calculatedExtent, { duration: 1000, padding: [50, 50, 50, 50] });
+        return;
+      }
+      
+      alert("No se pudo calcular la extensión de la capa (Extent fallido o vacío).");
+    } catch (e: any) {
+      alert("Error crítico en zoomToLayer: " + e.message);
+    }
+  };
 '''
 
-content = content[:render_start] + new_render + content[main_return:]
+start_str = 'const zoomToLayer = async (id: string) => {'
+end_str = 'const removeCustomLayer = (_id: string, layer: BaseLayer) => {'
 
-with open(file_path, 'w', encoding='utf-8') as f:
-    f.write(content)
-print('Done syntax fix!')
+start_idx = content.find(start_str)
+end_idx = content.find(end_str)
+
+if start_idx != -1 and end_idx != -1:
+    content = content[:start_idx] + zoom_func.strip() + '\n\n  ' + content[end_idx:]
+    with open('frontend/src/components/MapComponent.tsx', 'w', encoding='utf-8') as f:
+        f.write(content)
+    print("Patched with alerts!")
+else:
+    print("Could not find boundaries")

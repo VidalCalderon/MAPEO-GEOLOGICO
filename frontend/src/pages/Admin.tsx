@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import MapComponent from '../components/MapComponent';
+import MapComponent, { BASEMAPS } from '../components/MapComponent';
 import type { AdminLayerNode } from '../types/layer';
 import { Plus, Layers, Map as MapIcon, Settings, Eye, EyeOff, Folder, FolderOpen, FileText, Trash2, ChevronRight, ChevronDown, Edit2, GripVertical, List } from 'lucide-react';
 
@@ -10,6 +10,7 @@ const Admin: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('admin_auth') === 'true');
   const [password, setPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'layers' | 'maplayers' | 'add' | 'basemap' | 'settings'>('layers');
+  const [activeBasemapId, setActiveBasemapId] = useState('osm');
   
   const [addMode, setAddMode] = useState<'url' | 'file' | 'template'>('url');
   const [newUrl, setNewUrl] = useState('');
@@ -448,7 +449,28 @@ const Admin: React.FC = () => {
           </>
         )}
         
-        {activeTab === 'basemap' && (<div className="p-4"><p className="text-gray-500 text-sm">Configuración de mapas base próximamente.</p></div>)}
+        {activeTab === 'basemap' && (
+          <div className="flex flex-col h-full">
+            <div className="p-4 border-b border-gray-200 bg-gray-50">
+              <h2 className="text-lg font-bold text-gray-800">Mapas Base</h2>
+              <p className="text-xs text-gray-500 mt-1">Selecciona el mapa de fondo para tu visor</p>
+            </div>
+            <div className="p-4 space-y-2 overflow-y-auto">
+              {BASEMAPS.map((basemap) => (
+                <button
+                  key={basemap.id}
+                  onClick={() => {
+                    setActiveBasemapId(basemap.id);
+                    window.dispatchEvent(new CustomEvent('change-basemap', { detail: basemap.id }));
+                  }}
+                  className={`w-full text-left px-4 py-3 rounded-lg text-sm transition ${activeBasemapId === basemap.id ? "bg-blue-100 text-blue-800 font-bold border border-blue-200 shadow-sm" : "hover:bg-gray-100 border border-transparent text-gray-700"}`}
+                >
+                  {basemap.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         
         {activeTab === 'settings' && (
           <div className="p-4 border-b border-gray-200">

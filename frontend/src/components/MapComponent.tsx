@@ -94,7 +94,7 @@ interface LayerItem {
   children?: LayerItem[];
 }
 
-const BASEMAPS = [
+export const BASEMAPS = [
   { id: "osm", name: "OpenStreetMap", getSource: () => new OSM() },
   {
     id: "satellite",
@@ -678,7 +678,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
     }
   };
 
-  const zoomToLayer = (id: string) => {
+  const zoomToLayer = async (id: string) => {
     if (!mapRef.current) return;
 
     let targetLayer: any = null;
@@ -750,41 +750,88 @@ const MapComponent: React.FC<MapComponentProps> = ({
         arcgisUrl = source.getUrl();
     }
 
-    // 0. Vector
-    if (source && typeof source.getExtent === "function") {
-      const extent = source.getExtent();
-      if (extent && extent[0] !== Infinity && extent[0] !== -Infinity) {
-        mapRef
-          .current!.getView()
-          .fit(extent, { duration: 1000, padding: [50, 50, 50, 50] });
-        return;
-      }
-    }
+// --- NUEVO EXTENT RECURSIVO ---
+    let debugLog = "DEBUG:\n";
+    const getLayerExtent = async (layer: any, depth=0): Promise<any> => {
+      if (!layer) return null;
+      let prefix = "  ".repeat(depth);
+      debugLog += prefix + "- Tipo: " + layer.constructor.name + " | isGeoTIFF: " + layer.get('isGeoTIFF') + "\n";
+      let ext = typeof layer.getExtent === 'function' ? layer.getExtent() : null;
+      if (ext && ext.every(isFinite)) return ext;
 
-    // 1. TIFF
-    if (source && typeof source.getView === "function") {
-      const viewPromise = source.getView();
-      if (viewPromise && typeof viewPromise.then === "function") {
-        viewPromise.then((viewConfig: any) => {
-          let finalExtent = viewConfig.extent;
-          if (viewConfig.projection && viewConfig.projection !== "EPSG:3857") {
-            const projCode =
-              typeof viewConfig.projection.getCode === "function"
-                ? viewConfig.projection.getCode()
-                : viewConfig.projection;
-            finalExtent = transformExtent(
-              viewConfig.extent,
-              projCode,
-              "EPSG:3857",
-            );
-          }
-          mapRef
-            .current!.getView()
-            .fit(finalExtent, { duration: 800, padding: [50, 50, 50, 50] });
-        });
-        return;
+      const src = typeof layer.getSource === 'function' ? layer.getSource() : null;
+      if (src) {
+        debugLog += prefix + "  -> Source: " + src.constructor.name + "\n";
+        // TIFF Support
+        if (layer.get('isGeoTIFF') && typeof src.getView === 'function') {
+           try {
+             const viewConfig = await src.getView();
+             if (viewConfig && viewConfig.extent) {
+                let finalExt = viewConfig.extent;
+                if (viewConfig.projection && viewConfig.projection !== "EPSG:3857") {
+                    const projCode = typeof viewConfig.projection.getCode === "function" ? viewConfig.projection.getCode() : viewConfig.projection;
+                    finalExt = transformExtent(viewConfig.extent, projCode, "EPSG:3857");
+                }
+                return finalExt;
+             }
+           } catch(e: any) { console.error("Error obteniendo view del TIFF: " + e.message); }
+        }
+
+        if (typeof src.getExtent === 'function') {
+           ext = src.getExtent();
+           if (ext && ext.every(isFinite)) return ext;
+        }
+
+        // ImageStatic Support (KMZ overlays, JPG, PNG)
+        if (typeof src.getImageExtent === 'function') {
+           ext = src.getImageExtent();
+           if (ext && ext.every(isFinite)) return ext;
+        }
+        
+        // Vector Support
+        if (typeof src.getFeatures === 'function') {
+           const features = src.getFeatures();
+           if (features.length > 0) {
+             const vExt = createEmpty();
+             features.forEach((f: any) => {
+               if (f.getGeometry()) extend(vExt, f.getGeometry().getExtent());
+             });
+             if (vExt && vExt.every(isFinite)) return vExt;
+           }
+        }
       }
+
+      // Group Support
+      if (typeof layer.getLayers === 'function') {
+        const subLayers = layer.getLayers().getArray();
+        const groupExt = createEmpty();
+        let hasExt = false;
+        for (const sub of subLayers) {
+           const subExt = await getLayerExtent(sub, depth+1);
+           if (subExt && subExt.every(isFinite)) {
+             extend(groupExt, subExt);
+             hasExt = true;
+           }
+        }
+        if (hasExt) return groupExt;
+      }
+      return null;
+    };
+
+    const calculatedExtent = await getLayerExtent(targetLayer);
+    if (calculatedExtent && calculatedExtent.every(isFinite)) {
+      mapRef.current!.getView().fit(calculatedExtent, { duration: 1000, padding: [50, 50, 50, 50] });
+      return;
     }
+    
+    // Si falla absolutamente todo, vamos a PerU
+    console.warn("Fallo el zoom: " + debugLog);
+    const peruExtent = transformExtent(
+      [-81.33, -18.35, -68.65, -0.03],
+      "EPSG:4326",
+      "EPSG:3857"
+    );
+    mapRef.current!.getView().fit(peruExtent, { duration: 1000, padding: [50, 50, 50, 50] });
 
     // 2. ArcGIS
     if (
@@ -904,38 +951,6 @@ const MapComponent: React.FC<MapComponentProps> = ({
       return;
     }
 
-    // 3. Fallback Tradicional para SHP/GeoJSON
-    let extent;
-    if (
-      typeof targetLayer.getExtent === "function" &&
-      targetLayer.getExtent()
-    ) {
-      extent = targetLayer.getExtent();
-    } else if (source) {
-      if (typeof source.getExtent === "function" && source.getExtent()) {
-        extent = source.getExtent();
-      } else if (typeof source.getTileGrid === "function") {
-        const tg = source.getTileGrid();
-        if (tg && typeof tg.getExtent === "function") extent = tg.getExtent();
-      }
-    }
-
-    if (extent && extent.every((val: any) => isFinite(val))) {
-      // Expandimos ligeramente para no pegar a los bordes
-      mapRef
-        .current!.getView()
-        .fit(extent, { duration: 1000, padding: [50, 50, 50, 50] });
-    } else {
-      const sourceExtent =
-        source && typeof source.getExtent === "function"
-          ? source.getExtent()
-          : null;
-      if (sourceExtent && sourceExtent.every(isFinite)) {
-        mapRef
-          .current!.getView()
-          .fit(sourceExtent, { duration: 1000, padding: [50, 50, 50, 50] });
-      }
-    }
   };
 
   const removeCustomLayer = (_id: string, layer: BaseLayer) => {
@@ -1315,16 +1330,18 @@ const MapComponent: React.FC<MapComponentProps> = ({
             </div>
 
             <div className="flex items-center gap-0.5 pr-1">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  zoomToLayer(item.id);
-                }}
-                className="p-1 rounded text-gray-400 hover:bg-gray-200 hover:text-blue-600 transition-colors"
-                title="Acercar a esta capa"
-              >
-                <Search size={14} />
-              </button>
+              {(!item.isGroup || !item.children || item.children.length === 0) && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    zoomToLayer(item.id);
+                  }}
+                  className="p-1 rounded text-gray-400 hover:bg-gray-200 hover:text-blue-600 transition-colors"
+                  title="Acercar a esta capa"
+                >
+                  <Search size={14} />
+                </button>
+              )}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
