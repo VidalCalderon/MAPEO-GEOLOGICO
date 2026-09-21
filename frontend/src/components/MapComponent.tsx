@@ -16,6 +16,10 @@ import Translate from "ol/interaction/Translate";
 import Modify from "ol/interaction/Modify";
 import Snap from "ol/interaction/Snap";
 import { fromLonLat, transformExtent } from "ol/proj";
+import Style from "ol/style/Style";
+import Fill from "ol/style/Fill";
+import Stroke from "ol/style/Stroke";
+import CircleStyle from "ol/style/Circle";
 import {
   RefreshCw,
   Filter,
@@ -133,6 +137,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
   const modifyRef = useRef<Modify | null>(null);
   const snapRef = useRef<Snap | null>(null);
   const ol3dRef = useRef<any>(null); // Referencia a la instancia de OLCesium
+  const vectorLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
 
   const [activeTool, setActiveTool] = useState<Tool>(null);
   const [freehandTolerance, setFreehandTolerance] = useState(5);
@@ -164,6 +169,22 @@ const MapComponent: React.FC<MapComponentProps> = ({
     feature: Feature;
     type: string;
   } | null>(null);
+
+  const isWorkspaceVisible = (map: Map, workspaceId: string): boolean => {
+    let isVisible = true;
+    const findRecursive = (layersColl: any) => {
+      layersColl.forEach((layer: any) => {
+        if (layer.get("id") === workspaceId) {
+          isVisible = layer.getVisible();
+        }
+        if (layer.getLayers && typeof layer.getLayers === 'function') {
+          findRecursive(layer.getLayers());
+        }
+      });
+    };
+    findRecursive(map.getLayers());
+    return isVisible;
+  };
 
   const loadServerDrawings = async () => {
     try {
@@ -217,18 +238,45 @@ const MapComponent: React.FC<MapComponentProps> = ({
     const source = new VectorSource();
     sourceRef.current = source;
 
+    const defaultStyle = new Style({
+      fill: new Fill({ color: "rgba(255, 100, 50, 0.4)" }),
+      stroke: new Stroke({ color: "#444", width: 2 }),
+      image: new CircleStyle({
+        radius: 6,
+        fill: new Fill({ color: "#ff4444" }),
+      }),
+    });
+
     const vectorLayer = new VectorLayer({
       source: source,
-      style: {
-        "fill-color": "rgba(255, 100, 50, 0.4)",
-        "stroke-color": "#444",
-        "stroke-width": 2,
-        "circle-radius": 6,
-        "circle-fill-color": "#ff4444",
+      style: (feature) => {
+        const props = feature.getProperties();
+        const workspaceId = props.workspace;
+        
+        if (workspaceId && mapRef.current) {
+          const visible = isWorkspaceVisible(mapRef.current, workspaceId);
+          if (!visible) return undefined;
+        } else if (mapRef.current && props.Categoria) {
+          // Fallback if no workspace is saved but we have Categoria
+          let catWorkspace = '';
+          switch(props.Categoria) {
+            case 'Litologia': catWorkspace = 'grp-lito'; break;
+            case 'Alteracion': catWorkspace = 'grp-alt'; break;
+            case 'Mineralizacion': catWorkspace = 'grp-min'; break;
+            case 'LineString': catWorkspace = 'grp-est-lin'; break;
+            case 'Point': catWorkspace = 'grp-est-pt'; break;
+          }
+          if (catWorkspace) {
+            const visible = isWorkspaceVisible(mapRef.current, catWorkspace);
+            if (!visible) return undefined;
+          }
+        }
+        return defaultStyle;
       },
-      zIndex: 1000, // Asegurar que los dibujos estén por encima
+      zIndex: 1000,
     });
     vectorLayer.set("title", "Capa de Dibujos Geológicos");
+    vectorLayerRef.current = vectorLayer;
 
     const baseLayer = new TileLayer({
       source: new OSM(),
@@ -403,18 +451,44 @@ const MapComponent: React.FC<MapComponentProps> = ({
     const source = new VectorSource();
     sourceRef.current = source;
 
+    const defaultStyle = new Style({
+      fill: new Fill({ color: "rgba(255, 100, 50, 0.4)" }),
+      stroke: new Stroke({ color: "#444", width: 2 }),
+      image: new CircleStyle({
+        radius: 6,
+        fill: new Fill({ color: "#ff4444" }),
+      }),
+    });
+
     const vectorLayer = new VectorLayer({
       source: source,
-      style: {
-        "fill-color": "rgba(255, 100, 50, 0.4)",
-        "stroke-color": "#444",
-        "stroke-width": 2,
-        "circle-radius": 6,
-        "circle-fill-color": "#ff4444",
+      style: (feature) => {
+        const props = feature.getProperties();
+        const workspaceId = props.workspace;
+        
+        if (workspaceId && mapRef.current) {
+          const visible = isWorkspaceVisible(mapRef.current, workspaceId);
+          if (!visible) return undefined;
+        } else if (mapRef.current && props.Categoria) {
+          let catWorkspace = '';
+          switch(props.Categoria) {
+            case 'Litologia': catWorkspace = 'grp-lito'; break;
+            case 'Alteracion': catWorkspace = 'grp-alt'; break;
+            case 'Mineralizacion': catWorkspace = 'grp-min'; break;
+            case 'LineString': catWorkspace = 'grp-est-lin'; break;
+            case 'Point': catWorkspace = 'grp-est-pt'; break;
+          }
+          if (catWorkspace) {
+            const visible = isWorkspaceVisible(mapRef.current, catWorkspace);
+            if (!visible) return undefined;
+          }
+        }
+        return defaultStyle;
       },
       zIndex: 1000,
     });
     vectorLayer.set("title", "Capa de Dibujos Geológicos");
+    vectorLayerRef.current = vectorLayer;
 
     const baseLayer = new TileLayer({
       source: new OSM(),
@@ -553,6 +627,9 @@ const MapComponent: React.FC<MapComponentProps> = ({
     };
     toggleRecursive(mapRef.current.getLayers());
     updateLayersList(mapRef.current);
+    if (vectorLayerRef.current) {
+      vectorLayerRef.current.changed();
+    }
   };
 
   const zoomToLayer = (id: string) => {

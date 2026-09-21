@@ -91,7 +91,7 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
       return;
     }
     
-    const finalData = { ...formData, Categoria: geometryType === 'Polygon' ? polygonCategory : geometryType };
+    const finalData = { ...formData, Categoria: geometryType === 'Polygon' ? polygonCategory : geometryType, workspace: activeWorkspace };
     onSave(finalData);
   };
 
