@@ -189,6 +189,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
   const popupRef = useRef<HTMLDivElement>(null);
   const [popupInfo, setPopupInfo] = useState<{ coordinate: number[], properties: any } | null>(null);
   const [isLayerListOpen, setIsLayerListOpen] = useState(true);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [activeBasemapId, setActiveBasemapId] = useState("osm");
   const [is3DMode, setIs3DMode] = useState(false);
 
@@ -334,7 +335,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
           (layer.getLayers && typeof layer.getLayers === "function");
         let children: LayerItem[] = [];
         if (isGroup) {
-          children = buildTree(layer.getLayers());
+          children = buildTree(layer.getLayers()).reverse();
         }
 
         list.push({
@@ -1472,11 +1473,17 @@ const MapComponent: React.FC<MapComponentProps> = ({
             </div>
 
             <div className="relative group">
-              <div className="flex items-center gap-1 bg-gray-50 rounded px-2 md:px-3 py-1 md:py-1.5 cursor-pointer hover:bg-gray-100 border border-gray-300 text-gray-700 font-medium transition-colors">
+              <div 
+                className="flex items-center gap-1 bg-gray-50 rounded px-2 md:px-3 py-1 md:py-1.5 cursor-pointer hover:bg-gray-100 border border-gray-300 text-gray-700 font-medium transition-colors"
+                onClick={() => setOpenDropdown(openDropdown === 'tools' ? null : 'tools')}
+              >
                 <span>Tools</span>
                 <ChevronDown size={16} />
               </div>
-              <div className="absolute top-full right-0 mt-0 w-48 bg-white border border-gray-200 shadow-xl rounded-md hidden group-hover:flex flex-col py-1 z-50">
+              <div 
+                className={`absolute top-full right-0 mt-0 w-48 bg-white border border-gray-200 shadow-xl rounded-md flex-col py-1 z-50 ${openDropdown === 'tools' ? 'flex' : 'hidden md:group-hover:flex'}`}
+                onClick={() => setOpenDropdown(null)}
+              >
                 <button onClick={() => setActiveTool("Select")} className="flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-50 text-left text-gray-700"><MousePointer2 size={16} /> Select / Move</button>
                 <button onClick={() => {
                   const tolStr = prompt("Distancia en metros entre puntos (ej. 5):", "5");

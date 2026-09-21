@@ -29,7 +29,7 @@ export const buildLayerTree = async (nodes: AdminLayerNode[]): Promise<BaseLayer
       }
       
       const group = new LayerGroup({
-        layers: new Collection(childLayers),
+        layers: new Collection(childLayers.reverse()),
       });
       group.set('title', node.title);
       group.set('id', node.id);
@@ -90,5 +90,5 @@ export const buildLayerTree = async (nodes: AdminLayerNode[]): Promise<BaseLayer
     if (layer) rootLayers.push(layer);
   }
 
-  return rootLayers;
+  return rootLayers.reverse();
 };
