@@ -82,18 +82,31 @@ const Admin: React.FC = () => {
   const handleAddLayer = async () => {
     const newNode: AdminLayerNode = {
       id: generateId(),
-      type: 'layer',
-      title: newTitle || 'Nueva Capa',
+      type: addMode === 'template' ? 'group' : 'layer',
+      title: newTitle || (addMode === 'template' ? newUrl : 'Nueva Capa'),
       parentId: selectedParentId,
       enabled: true
     };
 
-    if (addMode === 'url') {
-      if (!newUrl) return;
+    if (addMode === 'template') {
+      if (!newUrl) {
+        alert('Selecciona una plantilla');
+        return;
+      }
+      newNode.expanded = true;
+      saveLayers([...adminLayers, newNode]);
+    } else if (addMode === 'url') {
+      if (!newUrl) {
+        alert('Ingresa una URL');
+        return;
+      }
       newNode.url = newUrl.trim();
       saveLayers([...adminLayers, newNode]);
     } else {
-      if (!newFile) return;
+      if (!newFile) {
+        alert('Selecciona un archivo');
+        return;
+      }
       const { saveAdminFileLayer } = await import('../utils/fileLayerUtils');
       await saveAdminFileLayer(newFile, newTitle);
       
