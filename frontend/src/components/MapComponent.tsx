@@ -283,64 +283,72 @@ const MapComponent: React.FC<MapComponentProps> = ({
   } | null>(null);
 
   const isFeatureVisible = (map: Map, rootWorkspaceId: string | undefined, catWorkspaceId: string, catTitle: string): { visible: boolean, opacity: number } => {
-    let isVisible = false; 
-    let found = false;
-    let finalOpacity = 1;
-
-    const findRecursive = (layersColl: any, parentVisible: boolean, inCorrectRoot: boolean, currentOpacity: number) => {
-      layersColl.forEach((layer: any) => {
-        const layerId = layer.get("id");
-        const isRoot = layerId === rootWorkspaceId;
-        const currentInCorrectRoot = inCorrectRoot || isRoot || !rootWorkspaceId;
-
-        const currentlyVisible = parentVisible && layer.getVisible();
-        const layerOpacity = currentOpacity * (layer.getOpacity() ?? 1);
-        
-        // Match subgroup by ID or Title, but only if we are inside the correct root group (if provided)
-        if (!found && currentInCorrectRoot && (layerId === catWorkspaceId || layer.get("title") === catTitle)) {
-          isVisible = currentlyVisible;
-          finalOpacity = layerOpacity;
-          found = true;
-        }
-        
-        if (layer.getLayers && typeof layer.getLayers === 'function') {
-          findRecursive(layer.getLayers(), currentlyVisible, currentInCorrectRoot, layerOpacity);
-        }
-      });
-    };
-
-    findRecursive(map.getLayers(), true, false, 1);
     
-    // Si no encontramos la subcapa específica (ej. Estructuras), pero tenemos un root (ej. Mapeo), 
-    // verificamos al menos si el root está encendido.
-    if (!found && rootWorkspaceId) {
-        let rootVisible = true;
-        let rootOpacity = 1;
-        let rootFound = false;
-        const findRoot = (layersColl: any, parentVisible: boolean, currentOpacity: number) => {
-           layersColl.forEach((layer: any) => {
-               const currentlyVisible = parentVisible && layer.getVisible();
-               const layerOpacity = currentOpacity * (layer.getOpacity() ?? 1);
-               if (layer.get("id") === rootWorkspaceId) {
-                   rootVisible = currentlyVisible;
-                   rootOpacity = layerOpacity;
-                   rootFound = true;
-               }
-               if (layer.getLayers && typeof layer.getLayers === 'function') {
-                   findRoot(layer.getLayers(), currentlyVisible, layerOpacity);
-               }
-           });
-        };
-        findRoot(map.getLayers(), true, 1);
-        if (rootFound) return { visible: rootVisible, opacity: rootOpacity };
+    // Paso 1: Si tenemos un rootWorkspaceId, verificar primero si el grupo raíz está visible
+    if (rootWorkspaceId) {
+      let rootVisible = true;
+      let rootOpacity = 1;
+      let rootFound = false;
+      
+      const findRoot = (layersColl: any, parentVisible: boolean, currentOpacity: number) => {
+        layersColl.forEach((layer: any) => {
+          const currentlyVisible = parentVisible && layer.getVisible();
+          const layerOpacity = currentOpacity * (layer.getOpacity() ?? 1);
+          if (layer.get("id") === rootWorkspaceId) {
+            rootVisible = currentlyVisible;
+            rootOpacity = layerOpacity;
+            rootFound = true;
+          }
+          if (layer.getLayers && typeof layer.getLayers === 'function') {
+            findRoot(layer.getLayers(), currentlyVisible, layerOpacity);
+          }
+        });
+      };
+      findRoot(map.getLayers(), true, 1);
+      
+      // Si encontramos el grupo raíz y está APAGADO, ocultar el feature inmediatamente
+      if (rootFound && !rootVisible) {
+        return { visible: false, opacity: 0 };
+      }
+      
+      // Paso 2: Buscar la subcategoría dentro del grupo raíz
+      let subFound = false;
+      let subVisible = false;
+      let subOpacity = 1;
+      
+      const findSub = (layersColl: any, parentVisible: boolean, inCorrectRoot: boolean, currentOpacity: number) => {
+        layersColl.forEach((layer: any) => {
+          const layerId = layer.get("id");
+          const isRoot = layerId === rootWorkspaceId;
+          const currentInCorrectRoot = inCorrectRoot || isRoot;
+          const currentlyVisible = parentVisible && layer.getVisible();
+          const layerOpacity = currentOpacity * (layer.getOpacity() ?? 1);
+          
+          if (!subFound && currentInCorrectRoot && (layerId === catWorkspaceId || layer.get("title") === catTitle)) {
+            subVisible = currentlyVisible;
+            subOpacity = layerOpacity;
+            subFound = true;
+          }
+          
+          if (layer.getLayers && typeof layer.getLayers === 'function') {
+            findSub(layer.getLayers(), currentlyVisible, currentInCorrectRoot, layerOpacity);
+          }
+        });
+      };
+      findSub(map.getLayers(), true, false, 1);
+      
+      if (subFound) {
+        return { visible: subVisible, opacity: subOpacity };
+      }
+      
+      // No se encontró la subcategoría pero el root sí está encendido
+      if (rootFound) {
+        return { visible: rootVisible, opacity: rootOpacity };
+      }
     }
-
-    if (!found) {
-        // If we really can't find the exact category layer, default to visible 
-        // to avoid disappearing drawings.
-        return { visible: true, opacity: 1 };
-    }
-    return { visible: isVisible, opacity: finalOpacity };
+    
+    // Sin rootWorkspaceId o sin encontrar nada — fallback a visible
+    return { visible: true, opacity: 1 };
   };
 
   const loadServerDrawings = async () => {

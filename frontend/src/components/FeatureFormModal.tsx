@@ -30,22 +30,37 @@ function getAvailableLayers(geometryType: string) {
         return false;
       };
 
-      return parsed.filter((l: any) => {
-        if (l.type !== 'group' || l.parentId) return false;
-        
-        // Si el grupo ES una categoría de edición (ej. "Litología"), NO es un proyecto.
+      // Encontrar grupos raíz (sin parentId o parentId vacío)
+      const rootGroups = parsed.filter((l: any) => {
+        if (l.type !== 'group') return false;
+        // Considerar como raíz si parentId es null, undefined, o string vacío
+        if (l.parentId && l.parentId !== '') return false;
+        // Si el grupo ES una categoría de edición directa, NO es un proyecto.
         if (isEditingCategory(l.title)) return false;
+        return true;
+      });
 
-        // Verificar si este proyecto tiene al menos un hijo que corresponda al tipo de geometría
+      // Filtrar: solo proyectos que tengan al menos un hijo de categoría de edición válido para este tipo de geometría
+      const validProjects = rootGroups.filter((root: any) => {
         const hasValidChild = parsed.some((child: any) => 
-          child.parentId === l.id && child.type === 'group' && isCategoryForGeometry(child.title, geometryType)
+          child.parentId === root.id && child.type === 'group' && isCategoryForGeometry(child.title, geometryType)
         );
-
-        // Si no tiene hijos válidos para esta geometría, NO es un proyecto válido para este dibujo
         return hasValidChild;
       });
+
+      // Si no encontramos proyectos con filtro estricto, devolver todos los grupos raíz que tengan hijos
+      if (validProjects.length === 0) {
+        const projectsWithChildren = rootGroups.filter((root: any) => {
+          return parsed.some((child: any) => child.parentId === root.id);
+        });
+        return projectsWithChildren;
+      }
+
+      return validProjects;
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('Error leyendo admin_layers:', e);
+  }
   return [];
 }
 
@@ -205,7 +220,7 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
         {/* BODY */}
         <div className="p-4 overflow-y-auto flex-1 space-y-3">
           
-          {availableLayers.length > 1 && (
+          {availableLayers.length >= 1 && (
             <div className="mb-2 p-1.5 bg-indigo-50/50 border border-indigo-100 rounded flex items-center gap-2">
               <div className="shrink-0">
                 <label className="block text-[11px] font-bold text-indigo-900">Proyecto / Escala</label>
