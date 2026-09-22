@@ -1442,9 +1442,33 @@ const MapComponent: React.FC<MapComponentProps> = ({
 
     map.on('singleclick', clickHandler);
     
+    const contextMenuHandler = (e: MouseEvent) => {
+      const isDrawing = document.getElementById('active-tool-marker')?.dataset.tool;
+      if (isDrawing === 'Select') {
+         let clickedFeature: any = null;
+         map.forEachFeatureAtPixel(map.getEventPixel(e), (feature) => {
+            if (!clickedFeature && feature.getGeometry()) {
+               clickedFeature = feature;
+            }
+         });
+         
+         if (clickedFeature) {
+            e.preventDefault();
+            setContextMenu({ x: e.clientX, y: e.clientY, feature: clickedFeature as Feature });
+         }
+      }
+    };
+    const closeContextMenu = () => setContextMenu(null);
+    
+    const viewport = map.getViewport();
+    viewport.addEventListener('contextmenu', contextMenuHandler as any);
+    viewport.addEventListener('click', closeContextMenu);
+    
     return () => {
       map.un('singleclick', clickHandler);
       map.removeOverlay(popupOverlay);
+      viewport.removeEventListener('contextmenu', contextMenuHandler as any);
+      viewport.removeEventListener('click', closeContextMenu);
     };
   }, [mapRef.current]);
 
