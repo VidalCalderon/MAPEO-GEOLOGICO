@@ -1,0 +1,237 @@
+﻿{
+    "value":  [
+                  {
+                      "id":  "fkvvxefka",
+                      "type":  "group",
+                      "title":  "Mapeo GeolÃ³gico_10K",
+                      "parentId":  null,
+                      "enabled":  true,
+                      "expanded":  false
+                  },
+                  {
+                      "id":  "no308uz15",
+                      "type":  "group",
+                      "title":  "Estructuras (Puntos)_10K",
+                      "parentId":  "fkvvxefka",
+                      "enabled":  true,
+                      "expanded":  true
+                  },
+                  {
+                      "id":  "skb4tytzv",
+                      "type":  "group",
+                      "title":  "Estructuras (LÃ­neas)_10K",
+                      "parentId":  "fkvvxefka",
+                      "enabled":  true,
+                      "expanded":  true
+                  },
+                  {
+                      "id":  "1bl84tjrz",
+                      "type":  "group",
+                      "title":  "MineralizaciÃ³n_10K",
+                      "parentId":  "fkvvxefka",
+                      "enabled":  true,
+                      "expanded":  true
+                  },
+                  {
+                      "id":  "j022r180j",
+                      "type":  "group",
+                      "title":  "AlteraciÃ³n_10K",
+                      "parentId":  "fkvvxefka",
+                      "enabled":  true,
+                      "expanded":  true
+                  },
+                  {
+                      "id":  "kxmkyrijr",
+                      "type":  "group",
+                      "title":  "LitologÃ­a_10K",
+                      "parentId":  "fkvvxefka",
+                      "enabled":  true,
+                      "expanded":  true
+                  },
+                  {
+                      "id":  "sy5wenr5a",
+                      "type":  "group",
+                      "title":  "Mapeo GeolÃ³gico 25K",
+                      "parentId":  null,
+                      "enabled":  true,
+                      "expanded":  false
+                  },
+                  {
+                      "id":  "4ffjy2ft2",
+                      "type":  "group",
+                      "title":  "Estructuras (Puntos)_25K",
+                      "parentId":  "sy5wenr5a",
+                      "enabled":  true,
+                      "expanded":  true
+                  },
+                  {
+                      "id":  "m04hm33av",
+                      "type":  "group",
+                      "title":  "Estructuras (LÃ­neas)_25K",
+                      "parentId":  "sy5wenr5a",
+                      "enabled":  true,
+                      "expanded":  true
+                  },
+                  {
+                      "id":  "weecq4fz4",
+                      "type":  "group",
+                      "title":  "MineralizaciÃ³n_25K",
+                      "parentId":  "sy5wenr5a",
+                      "enabled":  true,
+                      "expanded":  true
+                  },
+                  {
+                      "id":  "qeclx3ifx",
+                      "type":  "group",
+                      "title":  "AlteraciÃ³n_25K",
+                      "parentId":  "sy5wenr5a",
+                      "enabled":  true,
+                      "expanded":  true
+                  },
+                  {
+                      "id":  "6j59kt7az",
+                      "type":  "group",
+                      "title":  "LitologÃ­a_25K",
+                      "parentId":  "sy5wenr5a",
+                      "enabled":  true,
+                      "expanded":  true
+                  },
+                  {
+                      "id":  "vpj3skr4u",
+                      "type":  "layer",
+                      "title":  "Falla y Pliegues GeolÃ³gicos 100K",
+                      "parentId":  "pkocniqxf",
+                      "enabled":  true,
+                      "url":  "https://geocatmin.ingemmet.gob.pe/arcgis/rest/services/SERV_GEOLOGIA_FALLAS/MapServer/1"
+                  },
+                  {
+                      "id":  "izw3xytcx",
+                      "type":  "layer",
+                      "title":  "Fallas y Pliegues GeolÃ³gicos 50K",
+                      "parentId":  "pkocniqxf",
+                      "enabled":  true,
+                      "url":  "https://geocatmin.ingemmet.gob.pe/arcgis/rest/services/SERV_GEOLOGIA_FALLAS/MapServer/4"
+                  },
+                  {
+                      "id":  "x7mldeuqx",
+                      "type":  "group",
+                      "title":  "GeoquÃ­mica",
+                      "parentId":  null,
+                      "enabled":  false,
+                      "expanded":  false
+                  },
+                  {
+                      "id":  "pkocniqxf",
+                      "type":  "group",
+                      "title":  "Fallas y Pliegues Geologicos",
+                      "parentId":  null,
+                      "enabled":  false,
+                      "expanded":  false
+                  },
+                  {
+                      "id":  "dryqujdiq",
+                      "type":  "layer",
+                      "title":  "Sedimentos Quebradas",
+                      "parentId":  "x7mldeuqx",
+                      "enabled":  true,
+                      "url":  "https://geocatmin.ingemmet.gob.pe/arcgis/rest/services/SERV_GEOQUIMICA_2022/MapServer/0"
+                  },
+                  {
+                      "id":  "x17gak9tr",
+                      "type":  "layer",
+                      "title":  "GeoquÃ­mica de Suelos",
+                      "parentId":  "x7mldeuqx",
+                      "enabled":  true,
+                      "url":  "https://geocatmin.ingemmet.gob.pe/arcgis/rest/services/SERV_GEOQUIMICA_2022/MapServer/1"
+                  },
+                  {
+                      "id":  "hkijr6blo",
+                      "type":  "group",
+                      "title":  "Mapa GeolÃ³gica 50K",
+                      "parentId":  null,
+                      "enabled":  false,
+                      "expanded":  false
+                  },
+                  {
+                      "id":  "tsy62efcm",
+                      "type":  "layer",
+                      "title":  "Punto de ObservaciÃ³n",
+                      "parentId":  "hkijr6blo",
+                      "enabled":  true,
+                      "url":  "https://geocatmin.ingemmet.gob.pe/arcgis/rest/services/SERV_GEOLOGIA_50K_INTEGRADA/MapServer/0"
+                  },
+                  {
+                      "id":  "9dazyyqj2",
+                      "type":  "layer",
+                      "title":  "Estructura VolcÃ¡nica Point",
+                      "parentId":  "hkijr6blo",
+                      "enabled":  true,
+                      "url":  "https://geocatmin.ingemmet.gob.pe/arcgis/rest/services/SERV_GEOLOGIA_50K_INTEGRADA/MapServer/1"
+                  },
+                  {
+                      "id":  "maa0obdf7",
+                      "type":  "layer",
+                      "title":  "Fallas",
+                      "parentId":  "hkijr6blo",
+                      "enabled":  true,
+                      "url":  "https://geocatmin.ingemmet.gob.pe/arcgis/rest/services/SERV_GEOLOGIA_50K_INTEGRADA/MapServer/2"
+                  },
+                  {
+                      "id":  "ebrxb9qw7",
+                      "type":  "layer",
+                      "title":  "Pliegues",
+                      "parentId":  "hkijr6blo",
+                      "enabled":  true,
+                      "url":  "https://geocatmin.ingemmet.gob.pe/arcgis/rest/services/SERV_GEOLOGIA_50K_INTEGRADA/MapServer/3"
+                  },
+                  {
+                      "id":  "mhmgtha1s",
+                      "type":  "layer",
+                      "title":  "Estructura VolcÃ¡nica Line",
+                      "parentId":  "hkijr6blo",
+                      "enabled":  true,
+                      "url":  "https://geocatmin.ingemmet.gob.pe/arcgis/rest/services/SERV_GEOLOGIA_50K_INTEGRADA/MapServer/4"
+                  },
+                  {
+                      "id":  "6pzixdg66",
+                      "type":  "layer",
+                      "title":  "Diques",
+                      "parentId":  "hkijr6blo",
+                      "enabled":  true,
+                      "url":  "https://geocatmin.ingemmet.gob.pe/arcgis/rest/services/SERV_GEOLOGIA_50K_INTEGRADA/MapServer/5"
+                  },
+                  {
+                      "id":  "et45st86k",
+                      "type":  "layer",
+                      "title":  "Geoformas",
+                      "parentId":  "hkijr6blo",
+                      "enabled":  true,
+                      "url":  "https://geocatmin.ingemmet.gob.pe/arcgis/rest/services/SERV_GEOLOGIA_50K_INTEGRADA/MapServer/6"
+                  },
+                  {
+                      "id":  "yeyn2lzgy",
+                      "type":  "layer",
+                      "title":  "LitologÃ­a",
+                      "parentId":  "hkijr6blo",
+                      "enabled":  true,
+                      "url":  "https://geocatmin.ingemmet.gob.pe/arcgis/rest/services/SERV_GEOLOGIA_50K_INTEGRADA/MapServer/7"
+                  },
+                  {
+                      "id":  "0byjzkc3u",
+                      "type":  "group",
+                      "title":  "Catastro Minero",
+                      "parentId":  null,
+                      "enabled":  false,
+                      "expanded":  true
+                  },
+                  {
+                      "id":  "bbso61w7l",
+                      "type":  "layer",
+                      "title":  "Catastro Minero",
+                      "parentId":  "0byjzkc3u",
+                      "enabled":  true,
+                      "url":  "https://geocatmin.ingemmet.gob.pe/arcgis/rest/services/SERV_CATASTRO_MINERO_WGS84/MapServer/0"
+                  }
+              ],
+    "Count":  29
+}

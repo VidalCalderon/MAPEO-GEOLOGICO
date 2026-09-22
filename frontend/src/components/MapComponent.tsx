@@ -483,6 +483,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
         const res = await fetch("https://gimatc.pe/leer_capas.php");
         if (res.ok) {
           adminNodes = await res.json();
+          localStorage.setItem("admin_layers", JSON.stringify(adminNodes));
         }
       } catch (cloudErr) {
         console.warn("No se pudo cargar de la nube, intentando local", cloudErr);
