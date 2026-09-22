@@ -23,6 +23,7 @@ import Style from "ol/style/Style";
 import Fill from "ol/style/Fill";
 import Stroke from "ol/style/Stroke";
 import CircleStyle from "ol/style/Circle";
+import TextStyle from "ol/style/Text";
 import {
   RefreshCw,
   Filter,
@@ -53,10 +54,12 @@ import {
   X,
   ChevronUp,
   Sliders,
-  TableProperties, Edit } from "lucide-react";
+  TableProperties, Edit, LocateFixed } from "lucide-react";
 import BaseLayer from "ol/layer/Base";
 import proj4 from "proj4";
 import { register } from "ol/proj/proj4";
+import Point from "ol/geom/Point";
+import { createBox, createRegularPolygon } from "ol/interaction/Draw";
 
 proj4.defs(
   "EPSG:32717",
@@ -76,7 +79,8 @@ register(proj4);
 import DraggableWidget from "./DraggableWidget";
 import FeatureFormModal from "./FeatureFormModal";
 import Feature from "ol/Feature";
-
+import SketchPanel from "./SketchPanel";
+import { Pencil } from "lucide-react";
 // Cesium debe estar en el objeto global para que ol-cesium funcione en Vite
 import * as Cesium from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
@@ -175,8 +179,69 @@ const MapComponent: React.FC<MapComponentProps> = ({
   const ol3dRef = useRef<any>(null); // Referencia a la instancia de OLCesium
 
   const vectorLayerRef = useRef<any | null>(null);
+  
+  const gpsSourceRef = useRef<VectorSource | null>(null);
+  const [gpsActive, setGpsActive] = useState(false);
+  const watchIdRef = useRef<number | null>(null);
+
+  const toggleGps = () => {
+    if (gpsActive) {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      if (gpsSourceRef.current) gpsSourceRef.current.clear();
+      setGpsActive(false);
+    } else {
+      if ("geolocation" in navigator) {
+        setGpsActive(true);
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            const coords = fromLonLat([longitude, latitude]);
+            if (gpsSourceRef.current) {
+              gpsSourceRef.current.clear();
+              // Usar importaciones de Feature y Point (añadir Point arriba)
+              const pointFeature = new Feature(new Point(coords));
+              gpsSourceRef.current.addFeature(pointFeature);
+            }
+            if (mapRef.current) {
+              mapRef.current.getView().animate({ center: coords, zoom: 17, duration: 1000 });
+            }
+          },
+          (error) => {
+            if (error.code === error.TIMEOUT) {
+              console.warn("GPS Timeout: Esperando ubicación...");
+              // No mostrar alert para timeouts, solo reintentará automáticamente
+            } else {
+              alert("Error al obtener la ubicación: " + error.message);
+              setGpsActive(false);
+            }
+          },
+          { enableHighAccuracy: false, maximumAge: 10000, timeout: 20000 }
+        );
+      } else {
+        alert("Geolocalización no soportada en este dispositivo.");
+      }
+    }
+  };
 
   const [activeTool, setActiveTool] = useState<Tool>(null);
+  
+  // Sketch Panel State
+  const sketchSourceRef = useRef<VectorSource | null>(null);
+  const sketchDrawRef = useRef<Draw | null>(null);
+  const [isSketchPanelOpen, setIsSketchPanelOpen] = useState(false);
+  const [activeSketchTool, setActiveSketchTool] = useState<string | null>(null);
+  const [sketchColor, setSketchColor] = useState('#4a90e2');
+  const [sketchOpacity, setSketchOpacity] = useState(20);
+  const [strokeWidth, setStrokeWidth] = useState(2);
+  const [showMeasurements, setShowMeasurements] = useState(false);
+  
+  // To use in event listeners
+  const sketchStyleRef = useRef({ sketchColor, sketchOpacity, strokeWidth });
+  useEffect(() => { sketchStyleRef.current = { sketchColor, sketchOpacity, strokeWidth }; }, [sketchColor, sketchOpacity, strokeWidth]);
+
   const [freehandTolerance, setFreehandTolerance] = useState(5);
   const [layersList, setLayersList] = useState<LayerItem[]>([]);
   const layersListRef = useRef<LayerItem[]>([]);
@@ -506,9 +571,82 @@ const MapComponent: React.FC<MapComponentProps> = ({
     baseLayer.set("title", "Mapa Base");
     baseLayerRef.current = baseLayer as TileLayer<OSM | XYZ | TileArcGISRest>;
 
+    const gpsSource = new VectorSource();
+    gpsSourceRef.current = gpsSource;
+    const gpsLayer = new VectorLayer({
+      source: gpsSource,
+      style: new Style({
+        image: new CircleStyle({
+          radius: 8,
+          fill: new Fill({ color: '#3b82f6' }),
+          stroke: new Stroke({ color: 'white', width: 2 })
+        })
+      }),
+      zIndex: 2000
+    });
+    gpsLayer.set("title", "Ubicación GPS");
+
+    // Sketch Layer (bocetos locales)
+    const sketchSource = new VectorSource();
+    sketchSourceRef.current = sketchSource;
+    
+    // Cargar sketches guardados en localStorage
+    try {
+      const saved = localStorage.getItem('map_sketches');
+      if (saved) {
+        const geojson = new GeoJSON();
+        const features = geojson.readFeatures(saved, { featureProjection: 'EPSG:3857' });
+        sketchSource.addFeatures(features);
+      }
+    } catch (e) {
+      console.warn('Error cargando sketches:', e);
+    }
+
+    const sketchLayer = new VectorLayer({
+      source: sketchSource,
+      style: (feature: any) => {
+        const props = feature.getProperties();
+        const fillColor = props._sketchFill || 'rgba(74,144,226,0.2)';
+        const strokeColor = props._sketchStroke || '#4a90e2';
+        const sw = props._sketchStrokeWidth ?? 2;
+        const textContent = props._sketchText || '';
+        
+        return new Style({
+          fill: new Fill({ color: fillColor }),
+          stroke: new Stroke({ color: strokeColor, width: sw }),
+          image: new CircleStyle({
+            radius: 6,
+            fill: new Fill({ color: fillColor }),
+            stroke: new Stroke({ color: strokeColor, width: sw }),
+          }),
+          ...(textContent ? {
+            text: new TextStyle({
+              text: textContent,
+              font: '14px sans-serif',
+              fill: new Fill({ color: strokeColor }),
+              stroke: new Stroke({ color: '#fff', width: 3 }),
+            })
+          } : {}),
+        });
+      },
+      zIndex: 1500,
+    });
+    sketchLayer.set("title", "Bocetos Locales");
+
+    // Auto-guardar sketches en localStorage
+    sketchSource.on('change', () => {
+      try {
+        const geojson = new GeoJSON();
+        const json = geojson.writeFeatures(sketchSource.getFeatures(), { featureProjection: 'EPSG:3857' });
+        localStorage.setItem('map_sketches', json);
+      } catch (e) {
+        console.warn('Error guardando sketches:', e);
+      }
+    });
+
     const map = new Map({
       target: mapElement.current,
-      layers: [baseLayer, vectorLayer],
+      layers: [baseLayer, vectorLayer, sketchLayer, gpsLayer],
       view: new View({
         center: fromLonLat([-75.0, -10.0]),
         zoom: 5,
@@ -625,6 +763,95 @@ const MapComponent: React.FC<MapComponentProps> = ({
       map.addInteraction(snapRef.current);
     }
   }, [activeTool]);
+
+  // === Sketch Tool useEffect ===
+  useEffect(() => {
+    const map = mapRef.current;
+    const sketchSource = sketchSourceRef.current;
+    if (!map || !sketchSource) return;
+
+    // Limpiar interacción anterior
+    if (sketchDrawRef.current) {
+      map.removeInteraction(sketchDrawRef.current);
+      sketchDrawRef.current = null;
+    }
+
+    if (!activeSketchTool || activeSketchTool === 'Select') return;
+
+    // Si activamos sketch tool, desactivar herramienta principal
+    if (activeTool) setActiveTool(null);
+
+    if (activeSketchTool === 'Text') {
+      // Para texto: escuchar un click en el mapa
+      const handleTextClick = (evt: any) => {
+        const text = prompt('Ingrese el texto:');
+        if (text) {
+          const feat = new Feature(new Point(evt.coordinate));
+          const { sketchColor: sc, strokeWidth: sww } = sketchStyleRef.current;
+          feat.setProperties({
+            _sketchFill: `rgba(0,0,0,0)`,
+            _sketchStroke: sc,
+            _sketchStrokeWidth: sww,
+            _sketchText: text,
+            _isSketch: true,
+          });
+          sketchSource.addFeature(feat);
+        }
+        map.un('singleclick', handleTextClick);
+        setActiveSketchTool(null);
+      };
+      map.on('singleclick', handleTextClick);
+      return () => { map.un('singleclick', handleTextClick); };
+    }
+
+    let drawType: any = activeSketchTool;
+    let geometryFunction: any = undefined;
+    let freehand = false;
+
+    if (activeSketchTool === 'Rectangle') {
+      drawType = 'Circle';
+      geometryFunction = createBox();
+    } else if (activeSketchTool === 'Circle') {
+      drawType = 'Circle';
+      geometryFunction = createRegularPolygon(64);
+    } else if (activeSketchTool === 'Freehand') {
+      drawType = 'LineString';
+      freehand = true;
+    }
+
+    const draw = new Draw({
+      source: sketchSource,
+      type: drawType,
+      geometryFunction,
+      freehand,
+    });
+
+    draw.on('drawend', (evt: any) => {
+      const { sketchColor: sc, sketchOpacity: so, strokeWidth: sww } = sketchStyleRef.current;
+      const alpha = (100 - so) / 100;
+      // Convertir hex a rgba para fill
+      const r = parseInt(sc.slice(1, 3), 16);
+      const g = parseInt(sc.slice(3, 5), 16);
+      const b = parseInt(sc.slice(5, 7), 16);
+      const fillRgba = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+
+      evt.feature.setProperties({
+        _sketchFill: fillRgba,
+        _sketchStroke: sc,
+        _sketchStrokeWidth: sww,
+        _showMeasurements: showMeasurements,
+        _isSketch: true,
+      });
+    });
+
+    map.addInteraction(draw);
+    sketchDrawRef.current = draw;
+
+    return () => {
+      map.removeInteraction(draw);
+      sketchDrawRef.current = null;
+    };
+  }, [activeSketchTool]);
 
 
   const zoomToLayer = async (id: string) => {
@@ -1636,6 +1863,20 @@ const MapComponent: React.FC<MapComponentProps> = ({
           >
             <MousePointer2 size={18} />
           </button>
+          <button
+            onClick={toggleGps}
+            className={`p-2 rounded hover:bg-gray-100 transition ${gpsActive ? "bg-green-50 text-green-700 border border-green-200" : "text-gray-600 border border-transparent"}`}
+            title="Mostrar ubicación"
+          >
+            <LocateFixed size={18} />
+          </button>
+          <button
+            onClick={() => setIsSketchPanelOpen(!isSketchPanelOpen)}
+            className={`p-2 rounded hover:bg-gray-100 transition ${isSketchPanelOpen ? "bg-yellow-50 text-yellow-700 border border-yellow-200" : "text-gray-600 border border-transparent"}`}
+            title="Dibujar (Bocetos locales)"
+          >
+            <Pencil size={18} />
+          </button>
         </div>
 
         <div className="relative">
@@ -1923,6 +2164,32 @@ const MapComponent: React.FC<MapComponentProps> = ({
             <Trash2 size={14} /> Eliminar
           </button>
         </div>
+      )}
+
+      {/* Sketch Panel */}
+      {isSketchPanelOpen && (
+        <SketchPanel
+          onClose={() => {
+            setIsSketchPanelOpen(false);
+            setActiveSketchTool(null);
+          }}
+          activeSketchTool={activeSketchTool}
+          setActiveSketchTool={setActiveSketchTool}
+          sketchColor={sketchColor}
+          setSketchColor={setSketchColor}
+          sketchOpacity={sketchOpacity}
+          setSketchOpacity={setSketchOpacity}
+          strokeWidth={strokeWidth}
+          setStrokeWidth={setStrokeWidth}
+          showMeasurements={showMeasurements}
+          setShowMeasurements={setShowMeasurements}
+          onClearAll={() => {
+            if (sketchSourceRef.current) {
+              sketchSourceRef.current.clear();
+              localStorage.removeItem('map_sketches');
+            }
+          }}
+        />
       )}
 
       {pendingFeature && (
