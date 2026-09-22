@@ -22,10 +22,10 @@ function getAvailableLayers(geometryType: string) {
           return t.includes('litolog') || t.includes('alteraci') || t.includes('mineralizaci');
         }
         if (geomType === 'LineString') {
-          return t.includes('estructura') && (t.includes('l') || t.includes('lí'));
+          return t.includes('estructura') || t.includes('linea') || t.includes('línea') || t.includes('falla') || t.includes('veta');
         }
         if (geomType === 'Point') {
-          return t.includes('estructura') && (t.includes('p') || t.includes('pu'));
+          return t.includes('punto') || t.includes('pt') || (t.includes('estructura') && !t.includes('linea') && !t.includes('línea'));
         }
         return false;
       };

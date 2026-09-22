@@ -217,58 +217,65 @@ const MapComponent: React.FC<MapComponentProps> = ({
     type: string;
   } | null>(null);
 
-  const isFeatureVisible = (map: Map, rootWorkspaceId: string | undefined, catWorkspaceId: string, catTitle: string): boolean => {
+  const isFeatureVisible = (map: Map, rootWorkspaceId: string | undefined, catWorkspaceId: string, catTitle: string): { visible: boolean, opacity: number } => {
     let isVisible = false; 
     let found = false;
+    let finalOpacity = 1;
 
-    const findRecursive = (layersColl: any, parentVisible: boolean, inCorrectRoot: boolean) => {
+    const findRecursive = (layersColl: any, parentVisible: boolean, inCorrectRoot: boolean, currentOpacity: number) => {
       layersColl.forEach((layer: any) => {
         const layerId = layer.get("id");
         const isRoot = layerId === rootWorkspaceId;
         const currentInCorrectRoot = inCorrectRoot || isRoot || !rootWorkspaceId;
 
         const currentlyVisible = parentVisible && layer.getVisible();
+        const layerOpacity = currentOpacity * (layer.getOpacity() ?? 1);
         
         // Match subgroup by ID or Title, but only if we are inside the correct root group (if provided)
         if (!found && currentInCorrectRoot && (layerId === catWorkspaceId || layer.get("title") === catTitle)) {
           isVisible = currentlyVisible;
+          finalOpacity = layerOpacity;
           found = true;
         }
         
         if (layer.getLayers && typeof layer.getLayers === 'function') {
-          findRecursive(layer.getLayers(), currentlyVisible, currentInCorrectRoot);
+          findRecursive(layer.getLayers(), currentlyVisible, currentInCorrectRoot, layerOpacity);
         }
       });
     };
 
-    findRecursive(map.getLayers(), true, false);
+    findRecursive(map.getLayers(), true, false, 1);
     
     // Si no encontramos la subcapa específica (ej. Estructuras), pero tenemos un root (ej. Mapeo), 
     // verificamos al menos si el root está encendido.
     if (!found && rootWorkspaceId) {
         let rootVisible = true;
+        let rootOpacity = 1;
         let rootFound = false;
-        const findRoot = (layersColl: any, parentVisible: boolean) => {
+        const findRoot = (layersColl: any, parentVisible: boolean, currentOpacity: number) => {
            layersColl.forEach((layer: any) => {
                const currentlyVisible = parentVisible && layer.getVisible();
+               const layerOpacity = currentOpacity * (layer.getOpacity() ?? 1);
                if (layer.get("id") === rootWorkspaceId) {
                    rootVisible = currentlyVisible;
+                   rootOpacity = layerOpacity;
                    rootFound = true;
                }
                if (layer.getLayers && typeof layer.getLayers === 'function') {
-                   findRoot(layer.getLayers(), currentlyVisible);
+                   findRoot(layer.getLayers(), currentlyVisible, layerOpacity);
                }
            });
         };
-        findRoot(map.getLayers(), true);
-        if (rootFound) return rootVisible;
+        findRoot(map.getLayers(), true, 1);
+        if (rootFound) return { visible: rootVisible, opacity: rootOpacity };
     }
 
     if (!found) {
-        if (catWorkspaceId || catTitle || rootWorkspaceId) return false;
-        return true;
+        // If we really can't find the exact category layer, default to visible 
+        // to avoid disappearing drawings.
+        return { visible: true, opacity: 1 };
     }
-    return isVisible;
+    return { visible: isVisible, opacity: finalOpacity };
   };
 
   const loadServerDrawings = async () => {
@@ -437,31 +444,53 @@ const MapComponent: React.FC<MapComponentProps> = ({
         const rootWorkspaceId = props.workspace;
         
         let catWorkspace = '';
-        let catTitle = '';
-        switch(props.Categoria) {
-          case 'Litologia': catWorkspace = 'grp-lito'; catTitle = 'Litología'; break;
-          case 'Alteracion': catWorkspace = 'grp-alt'; catTitle = 'Alteración'; break;
-          case 'Mineralizacion': catWorkspace = 'grp-min'; catTitle = 'Mineralización'; break;
-          case 'LineString': catWorkspace = 'grp-est-lin'; catTitle = 'Estructuras (Líneas)'; break;
-          case 'Point': catWorkspace = 'grp-est-pt'; catTitle = 'Estructuras (Puntos)'; break;
-        }
+        let catTitle = props.Categoria || '';
+        
+        // Mantener compatibilidad con dibujos antiguos
+        if (props.Categoria === 'Litologia') { catWorkspace = 'grp-lito'; catTitle = 'Litología'; }
+        else if (props.Categoria === 'Alteracion') { catWorkspace = 'grp-alt'; catTitle = 'Alteración'; }
+        else if (props.Categoria === 'Mineralizacion') { catWorkspace = 'grp-min'; catTitle = 'Mineralización'; }
+        else if (props.Categoria === 'LineString') { catWorkspace = 'grp-est-lin'; catTitle = 'Estructuras (Líneas)'; }
+        else if (props.Categoria === 'Point') { catWorkspace = 'grp-est-pt'; catTitle = 'Estructuras (Puntos)'; }
+
+        let finalOpacityMultiplier = 1;
 
         if (mapRef.current) {
-          const visible = isFeatureVisible(mapRef.current, rootWorkspaceId, catWorkspace, catTitle);
-          if (!visible) return undefined;
+          const { visible, opacity } = isFeatureVisible(mapRef.current, rootWorkspaceId, catWorkspace, catTitle);
+          if (!visible) {
+            return undefined;
+          }
+          finalOpacityMultiplier = opacity;
         }
 
         const featureColor = getFeatureColor(props);
         const geomType = feature.getGeometry()?.getType();
-        const isLine = geomType === 'LineString' || geomType === 'MultiLineString' || props.Categoria === 'LineString' || props.Categoria === 'Estructura_Lineas';
         
+        // Extraer los componentes de color
+        let r, g, b, a;
+        const rgbaMatch = featureColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+        if (rgbaMatch) {
+            r = parseInt(rgbaMatch[1], 10);
+            g = parseInt(rgbaMatch[2], 10);
+            b = parseInt(rgbaMatch[3], 10);
+            a = rgbaMatch[4] ? parseFloat(rgbaMatch[4]) : 1;
+        } else {
+            // Si por alguna razón es hex o texto, asume 0.6 por defecto
+            r = 150; g = 150; b = 150; a = 0.6;
+        }
+        
+        const finalAlpha = a * finalOpacityMultiplier;
+        const adjustedColor = `rgba(${r}, ${g}, ${b}, ${finalAlpha})`;
+
+        const isLine = geomType === 'LineString' || geomType === 'MultiLineString' || props.Categoria === 'LineString' || props.Categoria === 'Estructura_Lineas';
+
         return new Style({
-          fill: new Fill({ color: featureColor }),
-          stroke: new Stroke({ color: isLine ? featureColor : "#444", width: isLine ? 3 : 2 }),
+          fill: new Fill({ color: adjustedColor }),
+          stroke: new Stroke({ color: isLine ? adjustedColor : "#444", width: isLine ? 3 : 2 }),
           image: new CircleStyle({
-            radius: 6,
-            fill: new Fill({ color: featureColor }),
-            stroke: new Stroke({ color: "#444", width: 1 }),
+            radius: 5,
+            fill: new Fill({ color: adjustedColor }),
+            stroke: new Stroke({ color: 'white', width: 1 }),
           }),
         });
       },
@@ -597,28 +626,6 @@ const MapComponent: React.FC<MapComponentProps> = ({
     }
   }, [activeTool]);
 
-  const toggleLayerVisibility = (id: string) => {
-    if (!mapRef.current) return;
-    const toggleRecursive = (layersColl: any) => {
-      layersColl.forEach((layer: any) => {
-        if (layer.get("id") === id) {
-          layer.setVisible(!layer.getVisible());
-        }
-        if (
-          (layer.get("isGroup") === true ||
-            typeof layer.getLayers === "function") &&
-          layer.getLayers
-        ) {
-          toggleRecursive(layer.getLayers());
-        }
-      });
-    };
-    toggleRecursive(mapRef.current.getLayers());
-    updateLayersList(mapRef.current);
-    if (vectorLayerRef.current) {
-      vectorLayerRef.current.changed();
-    }
-  };
 
   const zoomToLayer = async (id: string) => {
     if (!mapRef.current) return;
@@ -1172,6 +1179,30 @@ const MapComponent: React.FC<MapComponentProps> = ({
     );
   };
 
+  const toggleLayerVisibility = (id: string) => {
+    if (!mapRef.current) return;
+    const updateVisibilityRecursive = (layersColl: any) => {
+      layersColl.forEach((layer: any) => {
+        if (layer.get("id") === id) {
+          const currentVisible = layer.getVisible();
+          layer.setVisible(!currentVisible);
+        }
+        if (
+          (layer.get("isGroup") === true ||
+            typeof layer.getLayers === "function") &&
+          layer.getLayers
+        ) {
+          updateVisibilityRecursive(layer.getLayers());
+        }
+      });
+    };
+    updateVisibilityRecursive(mapRef.current.getLayers());
+    updateLayersList(mapRef.current);
+    if (vectorLayerRef.current) {
+      vectorLayerRef.current.changed();
+    }
+  };
+
   const handleOpacityChange = (id: string, opacity: number) => {
     if (!mapRef.current) return;
     const updateOpacityRecursive = (layersColl: any) => {
@@ -1190,6 +1221,9 @@ const MapComponent: React.FC<MapComponentProps> = ({
     };
     updateOpacityRecursive(mapRef.current.getLayers());
     updateLayersList(mapRef.current);
+    if (vectorLayerRef.current) {
+      vectorLayerRef.current.changed();
+    }
   };
 
   const toggleGroupExpanded = (id: string) => {
