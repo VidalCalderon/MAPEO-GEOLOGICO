@@ -309,9 +309,9 @@ const MapComponent: React.FC<MapComponentProps> = ({
       });
 
       if (res.ok) {
-        alert("Dibujos guardados en tu servidor cPanel exitosamente.");
+        console.log("Dibujos guardados en tu servidor cPanel exitosamente.");
       } else {
-        alert("Error al guardar en el servidor.");
+        console.error("Error al guardar en el servidor.");
       }
     } catch (e) {
       console.error(e);
@@ -1389,7 +1389,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
 
     const clickHandler = (e: any) => {
       const isDrawing = document.getElementById('active-tool-marker')?.dataset.tool;
-      if (isDrawing && isDrawing !== 'Select' && isDrawing !== 'null') {
+      if (isDrawing && isDrawing !== 'null') {
          setPopupInfo(null);
          popupOverlay.setPosition(undefined);
          return;
@@ -1487,7 +1487,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
                 className={`absolute top-full right-0 mt-0 w-48 bg-white border border-gray-200 shadow-xl rounded-md flex-col py-1 z-50 ${openDropdown === 'tools' ? 'flex' : 'hidden md:group-hover:flex'}`}
                 onClick={() => setOpenDropdown(null)}
               >
-                <button onClick={() => setActiveTool("Select")} className="flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-50 text-left text-gray-700"><MousePointer2 size={16} /> Select / Move</button>
+                <button onClick={() => setActiveTool("Select")} className={`flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-100 text-left ${activeTool === 'Select' ? 'bg-blue-50 text-blue-700 font-semibold border-l-4 border-blue-600' : 'text-gray-700'}`}><MousePointer2 size={16} /> Select / Move</button>
                 <button onClick={() => {
                   const tolStr = prompt("Distancia en metros entre puntos (ej. 5):", "5");
                   if (tolStr !== null) {
@@ -1495,27 +1495,27 @@ const MapComponent: React.FC<MapComponentProps> = ({
                     setFreehandTolerance(isNaN(tol) ? 5 : tol);
                     setActiveTool("FreehandPolygon");
                   }
-                }} className="flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-50 text-left text-gray-700"><PenTool size={16} /> Freehand Polygon</button>
+                }} className={`flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-100 text-left ${activeTool === 'FreehandPolygon' ? 'bg-blue-50 text-blue-700 font-semibold border-l-4 border-blue-600' : 'text-gray-700'}`}><PenTool size={16} /> Freehand Polygon</button>
                 <button onClick={() => setActiveTool("Polygon")}
-                  className="flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-50 text-left text-gray-700"
+                  className={`flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-100 text-left ${activeTool === 'Polygon' ? 'bg-blue-50 text-blue-700 font-semibold border-l-4 border-blue-600' : 'text-gray-700'}`}
                 >
                   <Hexagon size={16} /> Polygon
                 </button>
                 <button
                   onClick={() => setActiveTool("LineString")}
-                  className="flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-50 text-left text-gray-700"
+                  className={`flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-100 text-left ${activeTool === 'LineString' ? 'bg-blue-50 text-blue-700 font-semibold border-l-4 border-blue-600' : 'text-gray-700'}`}
                 >
                   <Minus size={16} /> LineString
                 </button>
                 <button
                   onClick={() => setActiveTool("Point")}
-                  className="flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-50 text-left text-gray-700"
+                  className={`flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-100 text-left ${activeTool === 'Point' ? 'bg-blue-50 text-blue-700 font-semibold border-l-4 border-blue-600' : 'text-gray-700'}`}
                 >
                   <MapPin size={16} /> Point
                 </button>
                 <button
                   onClick={() => setActiveTool("Modify")}
-                  className="flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-50 text-left text-gray-700"
+                  className={`flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-100 text-left ${activeTool === 'Modify' ? 'bg-blue-50 text-blue-700 font-semibold border-l-4 border-blue-600' : 'text-gray-700'}`}
                 >
                   <PenTool size={16} /> Modify
                 </button>
@@ -1524,7 +1524,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
                   onClick={() =>
                     setActiveTool(activeTool === "AddLayer" ? null : "AddLayer")
                   }
-                  className="flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-50 text-left text-gray-700"
+                  className={`flex items-center gap-2 px-3 md:px-4 py-2 hover:bg-gray-50 text-left ${activeTool === 'AddLayer' ? 'bg-blue-50 text-blue-700 font-semibold border-l-4 border-blue-600' : 'text-gray-700'}`}
                 >
                   <Database size={16} /> Add Layer
                 </button>

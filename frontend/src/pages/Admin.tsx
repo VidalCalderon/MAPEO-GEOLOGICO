@@ -23,6 +23,8 @@ const Admin: React.FC = () => {
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [dropPosition, setDropPosition] = useState<'top' | 'bottom' | 'inside' | null>(null);
 
+  const [sidebarWidth, setSidebarWidth] = useState(320);
+
   useEffect(() => {
     let raw = localStorage.getItem('admin_layers');
     if (!raw || raw === '[]') {
@@ -385,7 +387,32 @@ const Admin: React.FC = () => {
         </button>
       </div>
 
-      {['add', 'layers', 'basemap', 'settings'].includes(activeTab) && <div className="w-80 bg-white shadow-2xl z-20 flex flex-col border-r border-gray-200">
+      {['add', 'layers', 'basemap', 'settings'].includes(activeTab) && <div 
+          className="bg-white shadow-2xl z-20 flex flex-col border-r border-gray-200 relative shrink-0"
+          style={{ width: sidebarWidth }}
+        >
+          <div 
+            className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-blue-400 opacity-50 z-50 transition-colors"
+            style={{ transform: 'translateX(50%)' }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              const startX = e.clientX;
+              const startWidth = sidebarWidth;
+
+              const onMouseMove = (moveEvent: MouseEvent) => {
+                const newWidth = Math.max(200, Math.min(800, startWidth + (moveEvent.clientX - startX)));
+                setSidebarWidth(newWidth);
+              };
+
+              const onMouseUp = () => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+              };
+
+              document.addEventListener('mousemove', onMouseMove);
+              document.addEventListener('mouseup', onMouseUp);
+            }}
+          />
         {activeTab === 'layers' && (
           <>
             <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">

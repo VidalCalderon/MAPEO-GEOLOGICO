@@ -3,15 +3,31 @@ import { X } from 'lucide-react';
 import Feature from 'ol/Feature';
 import { POLYGON_RULES } from '../utils/formRules';
 
-function getAvailableLayers() {
+function getAvailableLayers(geometryType: string) {
   try {
     const raw = localStorage.getItem('admin_layers');
     if (raw) {
       const parsed = JSON.parse(raw);
+      
       const isEditingCategory = (title: string) => {
         if (!title) return false;
         const t = title.toLowerCase();
         return t.includes('litolog') || t.includes('alteraci') || t.includes('mineralizaci') || t.includes('estructura');
+      };
+
+      const isCategoryForGeometry = (title: string, geomType: string) => {
+        if (!title) return false;
+        const t = title.toLowerCase();
+        if (geomType === 'Polygon') {
+          return t.includes('litolog') || t.includes('alteraci') || t.includes('mineralizaci');
+        }
+        if (geomType === 'LineString') {
+          return t.includes('estructura') && (t.includes('l') || t.includes('lí'));
+        }
+        if (geomType === 'Point') {
+          return t.includes('estructura') && (t.includes('p') || t.includes('pu'));
+        }
+        return false;
       };
 
       return parsed.filter((l: any) => {
@@ -20,11 +36,13 @@ function getAvailableLayers() {
         // Si el grupo ES una categoría de edición (ej. "Litología"), NO es un proyecto.
         if (isEditingCategory(l.title)) return false;
 
-        // Es un proyecto/workspace si tiene como hijo alguna categoría de edición
-        const hasEditingChild = parsed.some((child: any) => 
-          child.parentId === l.id && child.type === 'group' && isEditingCategory(child.title)
+        // Verificar si este proyecto tiene al menos un hijo que corresponda al tipo de geometría
+        const hasValidChild = parsed.some((child: any) => 
+          child.parentId === l.id && child.type === 'group' && isCategoryForGeometry(child.title, geometryType)
         );
-        return hasEditingChild;
+
+        // Si no tiene hijos válidos para esta geometría, NO es un proyecto válido para este dibujo
+        return hasValidChild;
       });
     }
   } catch (e) {}
@@ -49,7 +67,7 @@ const STATIC_DOMAINS = {
 const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryType, onSave, onCancel }) => {
   const [formData, setFormData] = useState<any>({});
   const [errors, setErrors] = useState<any>({});
-  const availableLayers = getAvailableLayers();
+  const availableLayers = getAvailableLayers(geometryType);
   const defaultWorkspace = availableLayers.length === 1 ? availableLayers[0].id : (localStorage.getItem('active_workspace') || '');
   const [activeWorkspace, setActiveWorkspace] = useState(defaultWorkspace);
 
@@ -72,7 +90,49 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
   };
   
   // Categoría principal para Polígonos
-  const [polygonCategory, setPolygonCategory] = useState<'Litologia' | 'Alteracion' | 'Mineralizacion'>('Litologia');
+  const getAvailablePolygonCategories = () => {
+    try {
+      const raw = localStorage.getItem('admin_layers');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        let validNodes = [];
+        if (activeWorkspace) {
+          validNodes = parsed.filter((l: any) => l.parentId === activeWorkspace);
+        } else {
+          validNodes = parsed.filter((l: any) => !l.parentId);
+        }
+        
+        const cats: Array<{ value: string, label: string, originalType: string }> = [];
+        validNodes.forEach((c: any) => {
+          const t = c.title.toLowerCase();
+          if (t.includes('litolog') || t.includes('alteraci') || t.includes('mineralizaci')) {
+            cats.push({ value: c.title, label: c.title, originalType: t.includes('litolog') ? 'Litologia' : t.includes('alteraci') ? 'Alteracion' : 'Mineralizacion' });
+          }
+        });
+        
+        if (cats.length > 0) return cats;
+      }
+    } catch (e) {}
+    
+    return [
+      { value: 'Litología', label: 'Litología', originalType: 'Litologia' },
+      { value: 'Alteración', label: 'Alteración', originalType: 'Alteracion' },
+      { value: 'Mineralización', label: 'Mineralización', originalType: 'Mineralizacion' }
+    ];
+  };
+
+  const polygonCategories = getAvailablePolygonCategories();
+  const defaultCategory = polygonCategories.length > 0 ? (polygonCategories[0].value as 'Litologia'|'Alteracion'|'Mineralizacion') : 'Litologia';
+
+  const [polygonCategory, setPolygonCategory] = useState<'Litologia' | 'Alteracion' | 'Mineralizacion'>(defaultCategory);
+
+  React.useEffect(() => {
+    if (geometryType === 'Polygon' && polygonCategories.length > 0) {
+      if (!polygonCategories.find(c => c.value === polygonCategory)) {
+         setPolygonCategory(polygonCategories[0].value as any);
+      }
+    }
+  }, [activeWorkspace]);
 
   if (!feature) return null;
 
@@ -112,8 +172,11 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
   };
 
   // Obtener las reglas dinámicas para el polígono seleccionado
-  const dynamicRules = geometryType === 'Polygon' && formData.TIPO && POLYGON_RULES[polygonCategory]
-    ? POLYGON_RULES[polygonCategory][formData.TIPO] 
+  const selectedCatObj = polygonCategories.find(c => c.value === polygonCategory);
+  const baseCategory = selectedCatObj ? selectedCatObj.originalType : 'Litologia';
+
+  const dynamicRules = geometryType === 'Polygon' && formData.TIPO && POLYGON_RULES[baseCategory as any]
+    ? (POLYGON_RULES[baseCategory as any] as any)[formData.TIPO] 
     : {};
 
   return (
@@ -174,9 +237,9 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
                 }}
                 className="w-full border border-gray-300 rounded p-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
               >
-                <option value="Litologia">Litología</option>
-                <option value="Alteracion">Alteración</option>
-                <option value="Mineralizacion">Mineralización</option>
+                {polygonCategories.map(cat => (
+                   <option key={cat.value} value={cat.value}>{cat.label}</option>
+                ))}
               </select>
             </div>
           )}
@@ -246,7 +309,7 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
                 <label className="block text-xs font-semibold text-gray-700 mb-0.5">TIPO</label>
                 <select name="TIPO" value={formData.TIPO || ''} onChange={handleChange} className="w-full border border-gray-300 rounded p-1.5 text-xs">
                   <option value="">Seleccione...</option>
-                  {Object.keys(POLYGON_RULES[polygonCategory] || {}).map(tipo => (
+                  {Object.keys((POLYGON_RULES as any)[baseCategory] || {}).map(tipo => (
                     <option key={tipo} value={tipo}>{tipo}</option>
                   ))}
                 </select>
