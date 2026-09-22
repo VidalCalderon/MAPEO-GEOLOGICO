@@ -264,7 +264,10 @@ const MapComponent: React.FC<MapComponentProps> = ({
         if (rootFound) return rootVisible;
     }
 
-    if (!found) return true;
+    if (!found) {
+        if (catWorkspaceId || catTitle || rootWorkspaceId) return false;
+        return true;
+    }
     return isVisible;
   };
 
@@ -1855,6 +1858,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
           <button onClick={() => {
             if (confirm("¿Estás seguro de eliminar este dibujo?")) {
               sourceRef.current?.removeFeature(contextMenu.feature);
+              setTimeout(() => saveServerDrawings(), 500);
             }
             setContextMenu(null);
           }} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-red-50 text-red-600 text-left">
@@ -1873,8 +1877,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
                   sourceRef.current.addFeature(pendingFeature.feature);
                 }
                 setPendingFeature(null);
-                // Si quieres que guarde automáticamente en la nube tras llenar el form:
-                // setTimeout(() => saveServerDrawings(), 500);
+                setTimeout(() => saveServerDrawings(), 500);
               }}
               onCancel={() => {
                 setPendingFeature(null);
