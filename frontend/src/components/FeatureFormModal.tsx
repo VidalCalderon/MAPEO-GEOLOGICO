@@ -16,7 +16,11 @@ function getAvailableLayers() {
 
       return parsed.filter((l: any) => {
         if (l.type !== 'group' || l.parentId) return false;
-        if (isEditingCategory(l.title)) return true;
+        
+        // Si el grupo ES una categoría de edición (ej. "Litología"), NO es un proyecto.
+        if (isEditingCategory(l.title)) return false;
+
+        // Es un proyecto/workspace si tiene como hijo alguna categoría de edición
         const hasEditingChild = parsed.some((child: any) => 
           child.parentId === l.id && child.type === 'group' && isEditingCategory(child.title)
         );
@@ -115,33 +119,33 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
   return (
     <div 
       className="fixed z-[9999] bg-white rounded-lg shadow-2xl flex flex-col border border-gray-300"
-      style={{ left: position.x, top: position.y, width: '500px', maxHeight: '90vh' }}
+      style={{ left: position.x, top: position.y, width: '380px', maxHeight: '90vh' }}
     >
         
         {/* HEADER */}
         <div 
-        className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-100 rounded-t-lg cursor-move select-none"
+        className="px-4 py-3 border-b border-gray-200 flex justify-between items-center bg-gray-100 rounded-t-lg cursor-move select-none"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
       >
-          <h2 className="text-xl font-bold text-gray-800">
+          <h2 className="text-base font-bold text-gray-800">
             {geometryType === 'Point' ? 'Estructura (Punto)' : 
              geometryType === 'LineString' ? 'Estructura (Línea)' : 
              'Nueva Área Geológica'}
           </h2>
           <button onClick={onCancel} className="text-gray-400 hover:text-red-500 transition-colors">
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
         {/* BODY */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-4">
+        <div className="p-4 overflow-y-auto flex-1 space-y-3">
           
           {availableLayers.length > 1 && (
-            <div className="mb-3 p-2 bg-indigo-50/50 border border-indigo-100 rounded flex items-center gap-3">
+            <div className="mb-2 p-1.5 bg-indigo-50/50 border border-indigo-100 rounded flex items-center gap-2">
               <div className="shrink-0">
-                <label className="block text-xs font-bold text-indigo-900">Proyecto / Escala</label>
+                <label className="block text-[11px] font-bold text-indigo-900">Proyecto / Escala</label>
               </div>
               <select 
                 value={activeWorkspace} 
@@ -149,7 +153,7 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
                   setActiveWorkspace(e.target.value);
                   localStorage.setItem('active_workspace', e.target.value);
                 }}
-                className="flex-1 text-xs border border-indigo-200 rounded p-1 focus:ring-1 focus:ring-indigo-500 outline-none font-semibold text-indigo-800 bg-white"
+                className="flex-1 text-[11px] border border-indigo-200 rounded p-1 focus:ring-1 focus:ring-indigo-500 outline-none font-semibold text-indigo-800 bg-white"
               >
                 <option value="">-- Seleccione --</option>
                 {availableLayers.map((l: any) => (
@@ -160,15 +164,15 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
           )}
           
           {geometryType === 'Polygon' && (
-            <div className="mb-4">
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Tipo de Capa</label>
+            <div className="mb-3">
+              <label className="block text-xs font-semibold text-gray-700 mb-0.5">Tipo de Capa</label>
               <select 
                 value={polygonCategory} 
                 onChange={(e: any) => {
                   setPolygonCategory(e.target.value);
                   setFormData({}); // Limpiar datos al cambiar de categoría
                 }}
-                className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full border border-gray-300 rounded p-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="Litologia">Litología</option>
                 <option value="Alteracion">Alteración</option>
@@ -181,27 +185,27 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
           {geometryType === 'Point' && (
             <>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">TIPO *</label>
-                <select name="TIPO" onChange={handleChange} className="w-full border border-gray-300 rounded p-2">
+                <label className="block text-xs font-semibold text-gray-700 mb-0.5">TIPO *</label>
+                <select name="TIPO" onChange={handleChange} className="w-full border border-gray-300 rounded p-1.5 text-xs">
                   <option value="">Seleccione...</option>
                   {STATIC_DOMAINS.Puntos_TIPO.map(x => <option key={x} value={x}>{x}</option>)}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">DIP_DIR (0-360)</label>
-                  <input type="number" name="DIP_DIR" onChange={handleChange} className={`w-full border ${errors.DIP_DIR ? 'border-red-500' : 'border-gray-300'} rounded p-2`} />
-                  {errors.DIP_DIR && <p className="text-red-500 text-xs mt-1">{errors.DIP_DIR}</p>}
+                  <label className="block text-xs font-semibold text-gray-700 mb-0.5">DIP_DIR (0-360)</label>
+                  <input type="number" name="DIP_DIR" onChange={handleChange} className={`w-full border ${errors.DIP_DIR ? 'border-red-500' : 'border-gray-300'} rounded p-1.5 text-xs`} />
+                  {errors.DIP_DIR && <p className="text-red-500 text-[10px] mt-1">{errors.DIP_DIR}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">DIP (0-90)</label>
-                  <input type="number" name="DIP" onChange={handleChange} className={`w-full border ${errors.DIP ? 'border-red-500' : 'border-gray-300'} rounded p-2`} />
-                  {errors.DIP && <p className="text-red-500 text-xs mt-1">{errors.DIP}</p>}
+                  <label className="block text-xs font-semibold text-gray-700 mb-0.5">DIP (0-90)</label>
+                  <input type="number" name="DIP" onChange={handleChange} className={`w-full border ${errors.DIP ? 'border-red-500' : 'border-gray-300'} rounded p-1.5 text-xs`} />
+                  {errors.DIP && <p className="text-red-500 text-[10px] mt-1">{errors.DIP}</p>}
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">ANCHO (m)</label>
-                <input type="number" step="0.01" name="ANCHO" onChange={handleChange} className="w-full border border-gray-300 rounded p-2" />
+                <label className="block text-xs font-semibold text-gray-700 mb-0.5">ANCHO (m)</label>
+                <input type="number" step="0.01" name="ANCHO" onChange={handleChange} className="w-full border border-gray-300 rounded p-1.5 text-xs" />
               </div>
             </>
           )}
@@ -209,25 +213,25 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
           {/* CAMPOS PARA LÍNEAS */}
           {geometryType === 'LineString' && (
             <>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">TIPO *</label>
-                  <select name="TIPO" onChange={handleChange} className="w-full border border-gray-300 rounded p-2">
+                  <label className="block text-xs font-semibold text-gray-700 mb-0.5">TIPO *</label>
+                  <select name="TIPO" onChange={handleChange} className="w-full border border-gray-300 rounded p-1.5 text-xs">
                     <option value="">Seleccione...</option>
                     {STATIC_DOMAINS.Lineas_TIPO.map(x => <option key={x} value={x}>{x}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">SUBTIPO</label>
-                  <select name="SUBTIPO" onChange={handleChange} className="w-full border border-gray-300 rounded p-2">
+                  <label className="block text-xs font-semibold text-gray-700 mb-0.5">SUBTIPO</label>
+                  <select name="SUBTIPO" onChange={handleChange} className="w-full border border-gray-300 rounded p-1.5 text-xs">
                     <option value="">Seleccione...</option>
                     {STATIC_DOMAINS.Lineas_SUBTIPO.map(x => <option key={x} value={x}>{x}</option>)}
                   </select>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">TEXTURA</label>
-                <select name="TEXTURA" onChange={handleChange} className="w-full border border-gray-300 rounded p-2">
+                <label className="block text-xs font-semibold text-gray-700 mb-0.5">TEXTURA</label>
+                <select name="TEXTURA" onChange={handleChange} className="w-full border border-gray-300 rounded p-1.5 text-xs">
                   <option value="">Seleccione...</option>
                   {STATIC_DOMAINS.Lineas_TEXTURA.map(x => <option key={x} value={x}>{x}</option>)}
                 </select>
@@ -239,8 +243,8 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
           {geometryType === 'Polygon' && (
             <>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">TIPO</label>
-                <select name="TIPO" value={formData.TIPO || ''} onChange={handleChange} className="w-full border border-gray-300 rounded p-2">
+                <label className="block text-xs font-semibold text-gray-700 mb-0.5">TIPO</label>
+                <select name="TIPO" value={formData.TIPO || ''} onChange={handleChange} className="w-full border border-gray-300 rounded p-1.5 text-xs">
                   <option value="">Seleccione...</option>
                   {Object.keys(POLYGON_RULES[polygonCategory] || {}).map(tipo => (
                     <option key={tipo} value={tipo}>{tipo}</option>
@@ -250,11 +254,11 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
 
               {/* RENDERIZADO DINÁMICO DE SUB-CAMPOS */}
               {dynamicRules && Object.keys(dynamicRules).length > 0 && (
-                <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-4 mt-2">
+                <div className="grid grid-cols-2 gap-3 border-t border-gray-100 pt-3 mt-1">
                   {Object.entries(dynamicRules).map(([field, options]) => (
                     <div key={field}>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">{field}</label>
-                      <select name={field} onChange={handleChange} className="w-full border border-gray-300 rounded p-2">
+                      <label className="block text-xs font-semibold text-gray-700 mb-0.5">{field}</label>
+                      <select name={field} onChange={handleChange} className="w-full border border-gray-300 rounded p-1.5 text-xs">
                         <option value="">Seleccione...</option>
                         {(options as string[]).map(opt => (
                           <option key={opt} value={opt}>{opt}</option>
@@ -268,23 +272,23 @@ const FeatureFormModal: React.FC<FeatureFormModalProps> = ({ feature, geometryTy
           )}
 
           {/* CAMPOS COMUNES (SIEMPRE VISIBLES) */}
-          <div className="border-t border-gray-200 pt-4 mt-4">
-            <label className="block text-sm font-semibold text-gray-700 mb-1">DESCRIPCIÓN</label>
-            <textarea name="DESCRIPCION" rows={3} onChange={handleChange} className="w-full border border-gray-300 rounded p-2" placeholder="Notas de campo..."></textarea>
+          <div className="border-t border-gray-200 pt-3 mt-3">
+            <label className="block text-xs font-semibold text-gray-700 mb-0.5">DESCRIPCIÓN</label>
+            <textarea name="DESCRIPCION" rows={2} onChange={handleChange} className="w-full border border-gray-300 rounded p-1.5 text-xs" placeholder="Notas de campo..."></textarea>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">GEÓLOGO</label>
-            <input type="text" name="GEOLOGO" onChange={handleChange} className="w-full border border-gray-300 rounded p-2" placeholder="Ej: J. Perez" />
+            <label className="block text-xs font-semibold text-gray-700 mb-0.5">GEÓLOGO</label>
+            <input type="text" name="GEOLOGO" onChange={handleChange} className="w-full border border-gray-300 rounded p-1.5 text-xs" placeholder="Ej: J. Perez" />
           </div>
 
         </div>
 
         {/* FOOTER */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 rounded-b-lg">
-          <button onClick={onCancel} className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 font-medium">
+        <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 flex justify-end gap-2 rounded-b-lg">
+          <button onClick={onCancel} className="px-3 py-1.5 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-100 font-medium">
             Cancelar (Borrar)
           </button>
-          <button onClick={handleSave} className="px-4 py-2 bg-blue-600 rounded text-white hover:bg-blue-700 font-bold">
+          <button onClick={handleSave} className="px-3 py-1.5 text-xs bg-blue-600 rounded text-white hover:bg-blue-700 font-bold">
             Validar y Guardar
           </button>
         </div>
